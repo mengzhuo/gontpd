@@ -8,6 +8,11 @@ Support Linux/Darwin(Mac os)
 go get github.com/mengzhuo/gontpd/cmd/gontpd
 ```
 
+## run
+```
+gontpd -c config.yml
+```
+
 ## config
 ```
 # ntp listen address should be :123

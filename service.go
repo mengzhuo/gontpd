@@ -39,15 +39,6 @@ func NewService(cfg *Config) (s *Service, err error) {
 	}
 	s.template = newTemplate()
 
-	if cfg.ReqRateSec > 0 {
-		s.limiter = newLimitter(cfg.ReqRateSec)
-		go func() {
-			ticker := time.NewTicker(time.Duration(cfg.ReqRateSec) * time.Second)
-			for {
-				s.limiter.clear(<-ticker.C)
-			}
-		}()
-	}
 	return
 }
 
@@ -56,7 +47,6 @@ type Service struct {
 	conn     *net.UDPConn
 	stats    *statistic
 	cfg      *Config
-	limiter  *secondLimitter
 	template []byte
 	interval time.Duration
 	poll     int8
@@ -194,10 +184,14 @@ func (s *Service) workerDo(i int) {
 		remoteAddr  *net.UDPAddr
 		err         error
 		receiveTime time.Time
+		limiter     *secondLimitter
 	)
-	Info.Print("limiter status=", s.limiter != nil)
 
 	p := make([]byte, 48)
+	if s.cfg.ReqRateSec > 0 {
+		limiter = newLimitter(s.cfg.ReqRateSec)
+		go limiter.run()
+	}
 
 	defer func(i int) {
 		if r := recover(); r != nil {
@@ -220,8 +214,8 @@ func (s *Service) workerDo(i int) {
 			continue
 		}
 
-		if s.limiter != nil {
-			if !s.limiter.allow(remoteAddr.IP, receiveTime) {
+		if limiter != nil {
+			if !limiter.allow(remoteAddr.IP, receiveTime) {
 				Warn.Printf("worker[%d]: get limitted ip %s",
 					i, remoteAddr.String())
 				continue

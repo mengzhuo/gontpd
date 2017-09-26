@@ -2,12 +2,10 @@ package gontpd
 
 import (
 	"net"
-	"sync"
 	"time"
 )
 
 type secondLimitter struct {
-	mu       sync.RWMutex
 	interval int
 	bucket   []map[uint32]struct{}
 }
@@ -32,13 +30,19 @@ func (s *secondLimitter) clear(ts time.Time) {
 	s.bucket[key] = make(map[uint32]struct{}, l/2)
 }
 
+func (s *secondLimitter) run() {
+	ticker := time.NewTicker(time.Duration(s.interval) * time.Second)
+	for {
+		s.clear(<-ticker.C)
+	}
+}
+
 func newLimitter(interval int) *secondLimitter {
 	m := make([]map[uint32]struct{}, 60/interval)
 	for i := 0; i < len(m); i++ {
 		m[i] = map[uint32]struct{}{}
 	}
 	return &secondLimitter{
-		mu:       sync.RWMutex{},
 		interval: interval,
 		bucket:   m,
 	}

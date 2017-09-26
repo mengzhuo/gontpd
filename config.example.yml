@@ -1,7 +1,7 @@
-listen: ':5123'
+listen: ':123'
 metric: ':9090'
-geodb: helloWorld.geo
-worker: 7
+geodb: GeoLite2-Country.mmdb
+worker: 1
 rate: 4
 
 server:

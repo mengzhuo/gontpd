@@ -13,10 +13,21 @@ func randIP() net.IP {
 	return a
 }
 
+func TestMakeKey(t *testing.T) {
+	a := make(net.IP, 4)
+	a[0] = 0x32
+	a[1] = 0x54
+	a[2] = 0x18
+	a[3] = 0x38
+	if makeKey(a) != 0x32541838 {
+		t.Error(makeKey(a), a)
+	}
+}
+
 func TestSecondLimiter(t *testing.T) {
 	s := newLimitter(4)
 	a := randIP()
-	ts := time.Now()
+	ts := time.Unix(0, 0)
 	if !s.allow(a, ts) {
 		t.Error(a, "in limtter")
 	}
@@ -24,14 +35,12 @@ func TestSecondLimiter(t *testing.T) {
 		t.Error(a, "not in limtter")
 	}
 	at := ts.Add(time.Second)
-	s.step(at)
+	s.clear(at)
 
-	if s.allow(a, at) {
-		t.Error(a, "in limtter")
-	}
-	at = ts.Add(3 * time.Second)
-	s.step(at)
 	if !s.allow(a, at) {
+		t.Error(a, "in limtter", s.bucket)
+	}
+	if s.allow(a, at) {
 		t.Error(a, "not in limtter")
 	}
 }
@@ -40,14 +49,13 @@ func TestFullCheck(t *testing.T) {
 
 	s := newLimitter(4)
 	a := randIP()
-	ts := time.Now()
-
-	for i := 0; i < 120; i += 4 {
-		ts = ts.Add(4 * time.Second)
-		if s.allow(a, ts) {
+	ts := time.Unix(0, 0)
+	s.allow(a, ts)
+	for i := 0; i < 15; i += 4 {
+		ts = ts.Add(time.Second * 4)
+		if !s.allow(a, ts) {
 			t.Error(a, ts, "in limtter")
 		}
-		s.step(ts)
 	}
 
 }

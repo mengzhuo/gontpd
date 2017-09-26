@@ -13,7 +13,7 @@ type Config struct {
 	ExpoMetric string   `yaml:"metric"`
 	GeoDB      string   `yaml:"geodb"`
 	WorkerNum  int      `yaml:"worker"`
-	ReqRateSec int      `yaml:"rate“`
+	ReqRateSec int      `yaml:"rate"`
 }
 
 func NewConfigFromFile(s string) (cfg *Config, err error) {

@@ -1,5 +1,5 @@
-listen: :5123
-metric: :9090
+listen: ':5123'
+metric: ':9090'
 geodb: helloWorld.geo
 worker: 7
 rate: 4

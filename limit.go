@@ -12,10 +12,13 @@ type secondLimitter struct {
 	bucket   []map[uint32]struct{}
 }
 
+func makeKey(ip net.IP) uint32 {
+	return uint32(ip[0])<<24 + uint32(ip[1])<<16 + uint32(ip[2])<<8 + uint32(ip[3])
+}
+
 func (s *secondLimitter) allow(ip net.IP, ts time.Time) (a bool) {
 	buck := s.bucket[ts.Second()/s.interval]
-	var key uint32
-	key = uint32(ip[0]<<24) + uint32(ip[1]<<16) + uint32(ip[2]<<8) + uint32(ip[3])
+	key := makeKey(ip)
 	_, in := buck[key]
 	if !in {
 		buck[key] = struct{}{}
@@ -23,14 +26,10 @@ func (s *secondLimitter) allow(ip net.IP, ts time.Time) (a bool) {
 	return !in
 }
 
-func (s *secondLimitter) step(ts time.Time) {
+func (s *secondLimitter) clear(ts time.Time) {
 	key := ts.Second() / s.interval
 	l := len(s.bucket[key])
-	prev := key - 1
-	if prev < 0 {
-		prev = len(s.bucket) - 1
-	}
-	s.bucket[prev] = make(map[uint32]struct{}, l/2)
+	s.bucket[key] = make(map[uint32]struct{}, l/2)
 }
 
 func newLimitter(interval int) *secondLimitter {

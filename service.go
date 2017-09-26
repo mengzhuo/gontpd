@@ -44,7 +44,7 @@ func NewService(cfg *Config) (s *Service, err error) {
 		go func() {
 			ticker := time.NewTicker(time.Duration(cfg.ReqRateSec) * time.Second)
 			for {
-				s.limiter.step(<-ticker.C)
+				s.limiter.clear(<-ticker.C)
 			}
 		}()
 	}

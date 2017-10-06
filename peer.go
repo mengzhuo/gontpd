@@ -219,11 +219,14 @@ func (p *peer) run(pctx context.Context) {
 		resp, err := ntp.Query(p.addr)
 		p.reach <<= 1
 		p.queryCount++
-		if verr := resp.Validate(); err == nil && verr == nil {
+		if err == nil && resp != nil && resp.Validate() == nil {
 			p.reach |= 1
 			p.insertFilter(resp)
 		} else {
-			Warn.Print(verr, err)
+			Warn.Print(err)
+			if resp != nil {
+				Warn.Print(resp.Validate(), resp)
+			}
 		}
 
 		peerTransTable[p.state](p, resp, err)

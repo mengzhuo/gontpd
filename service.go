@@ -225,6 +225,14 @@ func (s *Service) workerDo(i int) {
 
 		// GetMode
 		switch p[LiVnMode] &^ 0xf8 {
+		case ModeSymmetricActive:
+			// return
+			errBuf := make([]byte, 48)
+			copy(errBuf, s.template)
+			SetUint8(errBuf, Stratum, 0)
+			SetUint32(errBuf, ReferIDPos, 0x41435354)
+			s.conn.WriteToUDP(errBuf, remoteAddr)
+
 		case ModeReserved:
 			fallthrough
 		case ModeClient:
@@ -240,7 +248,7 @@ func (s *Service) workerDo(i int) {
 			}
 			s.stats.logIP(remoteAddr)
 		default:
-			Warn.Printf("%s not client request mode:%x",
+			Warn.Printf("%s not support client request mode:%x",
 				remoteAddr.String(), p[LiVnMode]&^0xf8)
 		}
 	}

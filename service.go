@@ -189,6 +189,7 @@ func (s *Service) workerDo(i int) {
 
 	p := make([]byte, 48)
 	if s.cfg.ReqRateSec > 0 {
+		Info.Printf("limiter %d", s.cfg.ReqRateSec)
 		limiter = newLimitter(s.cfg.ReqRateSec)
 		go limiter.run()
 	}

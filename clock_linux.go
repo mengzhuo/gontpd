@@ -8,11 +8,13 @@ import (
 )
 
 func (s *Service) setOffset(p *peer) (err error) {
+
 	Info.Printf("set offset from :%s offset=%s", p.addr, p.offset)
+
 	tmx := &syscall.Timex{}
 	offsetNsec := p.offset.Nanoseconds()
 
-	if p.offset < maxAdjust {
+	if absDuration(p.offset) < maxAdjust {
 		tmx.Modes = ADJ_STATUS | ADJ_NANO | ADJ_OFFSET | ADJ_TIMECONST | ADJ_MAXERROR | ADJ_ESTERROR
 		tmx.Status = STA_PLL
 		tmx.Offset = offsetNsec
@@ -28,7 +30,8 @@ func (s *Service) setOffset(p *peer) (err error) {
 			tmx.Time.Sec -= 1
 			tmx.Time.Usec += nanoSecPerSec
 		}
-		Info.Printf("clock jumped")
+		Warn.Printf("settimeofday from %s = %s", p.addr, p.offset)
+		return syscall.Settimeofday(&tmx.Time)
 	}
 
 	switch p.leap {

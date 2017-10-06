@@ -15,11 +15,11 @@ func TestConfigLoad(t *testing.T) {
 		data, err := ioutil.ReadFile("config.example.yml")
 		t.Error(string(data), err)
 	}
-	if cfg.WorkerNum != 7 {
+	if cfg.WorkerNum != 1 {
 		t.Error(cfg)
 	}
 
-	if cfg.GeoDB != "helloWorld.geo" {
+	if cfg.GeoDB != "GeoLite2-Country.mmdb" {
 		t.Error(cfg)
 	}
 }

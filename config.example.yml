@@ -1,14 +1,11 @@
 listen: ':123'
-metric: ':9090'
+metric: ':7370'
 geodb: GeoLite2-Country.mmdb
-worker: 1
-rate: 4
+worker: 2
+rate: 0
 
 server:
-    - time1.aliyun.com
-    - time2.aliyun.com
-    - time3.aliyun.com
-    - time4.aliyun.com
-    - time5.aliyun.com
-    - time6.aliyun.com
-    - time7.aliyun.com
+    - time1.apple.com
+    - time2.apple.com
+    - time3.apple.com
+    - time4.apple.com

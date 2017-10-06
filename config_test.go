@@ -10,12 +10,12 @@ func TestConfigLoad(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if cfg.ReqRateSec != 4 {
+	if cfg.ReqRateSec != 0 {
 		t.Error(cfg)
 		data, err := ioutil.ReadFile("config.example.yml")
 		t.Error(string(data), err)
 	}
-	if cfg.WorkerNum != 1 {
+	if cfg.WorkerNum != 2 {
 		t.Error(cfg)
 	}
 

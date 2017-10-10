@@ -5,6 +5,7 @@ import (
 	"math"
 	"strings"
 	"syscall"
+	"time"
 )
 
 func (s *Service) setOffset(p *peer) (err error) {
@@ -22,16 +23,10 @@ func (s *Service) setOffset(p *peer) (err error) {
 		tmx.Maxerror = 0
 		tmx.Esterror = 0
 	} else {
-		tmx.Modes = ADJ_STATUS | ADJ_NANO | ADJ_SETOFFSET
-		tmx.Time.Sec = offsetNsec / nanoSecPerSec
-		tmx.Time.Usec = offsetNsec - (tmx.Time.Sec * nanoSecPerSec)
 
-		if tmx.Time.Usec < 0 {
-			tmx.Time.Sec -= 1
-			tmx.Time.Usec += nanoSecPerSec
-		}
 		Warn.Printf("settimeofday from %s = %s", p.addr, p.offset)
-		return syscall.Settimeofday(&tmx.Time)
+		tv := syscall.NsecToTimeval(time.Now().Add(p.offset).UnixNano())
+		return syscall.Settimeofday(tv)
 	}
 
 	switch p.leap {

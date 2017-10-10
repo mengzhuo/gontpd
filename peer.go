@@ -280,12 +280,12 @@ func (p *peer) checkFilter() (valid bool) {
 	p.best = bestIndex
 	r := p.filter[bestIndex]
 	p.dispersion = r.dispersion
+	p.delay = r.delay + r.resp.RootDelay
 	p.rootDelay = r.resp.RootDelay + r.resp.RTT
-	p.delay = r.delay
 	p.rootDisp = r.resp.RootDispersion
 	p.offset = r.resp.ClockOffset
 	p.interval = r.resp.Poll
-	p.referTime = r.resp.ReferenceTime
+	p.referTime = time.Now()
 	p.referId = r.resp.ReferenceID
 	p.stratum = r.resp.Stratum
 	p.updateAt = time.Now()

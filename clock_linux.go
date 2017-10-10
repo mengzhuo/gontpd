@@ -26,7 +26,7 @@ func (s *Service) setOffset(p *peer) (err error) {
 
 		Warn.Printf("settimeofday from %s = %s", p.addr, p.offset)
 		tv := syscall.NsecToTimeval(time.Now().Add(p.offset).UnixNano())
-		return syscall.Settimeofday(tv)
+		return syscall.Settimeofday(&tv)
 	}
 
 	switch p.leap {

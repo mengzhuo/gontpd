@@ -23,10 +23,17 @@ type statistic struct {
 
 func newStatistic(cfg *Config) *statistic {
 
-	geoDB, err := geoip2.Open(cfg.GeoDB)
-	if err != nil {
-		Error.Fatal(err)
-		return nil
+	var (
+		geoDB *geoip2.Reader
+		err   error
+	)
+
+	if cfg.GeoDB != "" {
+		geoDB, err = geoip2.Open(cfg.GeoDB)
+		if err != nil {
+			Error.Fatal(err)
+			return nil
+		}
 	}
 
 	reqCounter := prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -101,11 +108,17 @@ func newStatistic(cfg *Config) *statistic {
 }
 
 func (s *statistic) logIP(raddr *net.UDPAddr) {
+
+	s.fastCounter.Inc()
+
+	if s.geoDB == nil {
+		return
+	}
+
 	country, err := s.geoDB.Country(raddr.IP)
 	if err != nil {
 		Error.Print("stat ip err=", err)
 		return
 	}
-	s.fastCounter.Inc()
 	s.reqCounter.WithLabelValues(country.Country.IsoCode).Inc()
 }

@@ -136,10 +136,12 @@ func (s *Service) setParams(p *peer) {
 	SetInt8(s.template, ClockPrecision, systemPrecision())
 
 	SetUint32(s.template, RootDelayPos, toNtpShortTime(p.delay))
-	s.stats.delayGauge.Set(p.delay.Seconds())
 
-	s.stats.offsetGauge.Set(p.offset.Seconds())
-	s.stats.dispGauge.Set(p.dispersion.Seconds())
+	if s.stats != nil {
+		s.stats.delayGauge.Set(p.delay.Seconds())
+		s.stats.offsetGauge.Set(p.offset.Seconds())
+		s.stats.dispGauge.Set(p.dispersion.Seconds())
+	}
 
 	SetUint32(s.template, RootDispersionPos, toNtpShortTime(p.dispersion))
 	SetUint64(s.template, ReferenceTimeStamp, toNtpTime(p.updateAt))
@@ -246,7 +248,9 @@ func (s *Service) workerDo(i int) {
 				Error.Printf("worker: %s write failed. %s", remoteAddr.String(), err)
 				continue
 			}
-			s.stats.logIP(remoteAddr)
+			if s.stats != nil {
+				s.stats.logIP(remoteAddr)
+			}
 		default:
 			Warn.Printf("%s not support client request mode:%x",
 				remoteAddr.String(), p[LiVnMode]&^0xf8)
@@ -255,9 +259,11 @@ func (s *Service) workerDo(i int) {
 }
 
 func (s *Service) Serve() error {
+
 	if s.cfg.ExpoMetric != "" {
 		s.stats = newStatistic(s.cfg)
 	}
+
 	ctx := context.TODO()
 	for _, p := range s.peerList {
 		go p.run(ctx)

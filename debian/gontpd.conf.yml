@@ -1,0 +1,9 @@
+listen: :123
+metric: :8123
+geodb: /var/lib/gontpd/db/GeoLite2-Country.mmdb
+worker: 0
+rate: 0
+
+server:
+    - 10.14.0.135
+    - 10.14.0.136

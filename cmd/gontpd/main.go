@@ -19,14 +19,10 @@ func main() {
 	nilLogger := log.New(ioutil.Discard, "", log.Ldate)
 
 	switch *level {
-	case "debug":
 	case "info":
-		gontpd.Debug = nilLogger
 	case "warn":
-		gontpd.Debug = nilLogger
 		gontpd.Info = nilLogger
 	case "error":
-		gontpd.Debug = nilLogger
 		gontpd.Info = nilLogger
 		gontpd.Warn = nilLogger
 	}

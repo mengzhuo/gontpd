@@ -2,6 +2,7 @@ package gontpd
 
 import (
 	"context"
+	"log"
 	"net"
 	"sort"
 	"time"
@@ -92,15 +93,21 @@ func (s *Service) syncClock() (err error) {
 	availablePeers := []*peer{}
 	for _, p := range s.peerList {
 		if p.state < stateSyncing {
-			Debug.Printf("%s state not Syncing", p.addr)
+			if debug {
+				log.Printf("%s state not Syncing", p.addr)
+			}
 			continue
 		}
 		if p.stratum >= 15 {
-			Debug.Printf("%s stratum is bad", p.addr)
+			if debug {
+				log.Printf("%s stratum is bad", p.addr)
+			}
 			continue
 		}
 		if p.delay >= MaxRootDelay {
-			Debug.Printf("%s delay %s >= MaxRootDelay %s", p.addr, p.delay, MaxRootDelay)
+			if debug {
+				log.Printf("%s delay %s >= MaxRootDelay %s", p.addr, p.delay, MaxRootDelay)
+			}
 			continue
 		}
 		availablePeers = append(availablePeers, p)
@@ -115,9 +122,13 @@ func (s *Service) syncClock() (err error) {
 		return s.setOffset(availablePeers[0])
 	default:
 		sort.Sort(byOffset(availablePeers))
-		Debug.Printf("availablePeers %d", len(availablePeers))
+		if debug {
+			log.Printf("availablePeers %d", len(availablePeers))
+		}
 		for _, p := range availablePeers {
-			Debug.Printf(" |-- %s", p)
+			if debug {
+				log.Printf(" |-- %s", p)
+			}
 		}
 		bestPeer := availablePeers[len(availablePeers)/2]
 		s.setParams(bestPeer)
@@ -156,7 +167,9 @@ func (s *Service) setParams(p *peer) {
 		s.interval = 30 * time.Second
 	}
 	s.poll = int8(durationToPoll(s.interval))
-	Debug.Printf("try to set poll %d, by %s", s.poll, s.interval)
+	if debug {
+		log.Printf("try to set poll %d, by %s", s.poll, s.interval)
+	}
 	if s.poll > maxPoll {
 		s.poll = maxPoll
 	}

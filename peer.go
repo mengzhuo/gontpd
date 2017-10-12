@@ -3,6 +3,7 @@ package gontpd
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/bits"
 	"time"
 
@@ -79,7 +80,9 @@ type filter struct {
 func peerInit(p *peer, resp *ntp.Response, err error) {
 	if p.queryCount < minFilterCount {
 		// keep init
-		Debug.Printf("query Count:%d keep initing", p.queryCount)
+		if debug {
+			log.Printf("query Count:%d keep initing", p.queryCount)
+		}
 		return
 	}
 
@@ -145,10 +148,14 @@ func peerStable(p *peer, resp *ntp.Response, err error) {
 }
 
 func syncClock(p *peer) {
-	if DebugFlag&NoSyncClock != 0 {
-		Debug.Printf("syncClock to:%s, offset:%s", p.addr, p.offset)
+
+	if NoSyncClock != 0 {
+		if debug {
+			log.Printf("syncClock to:%s, offset:%s", p.addr, p.offset)
+		}
 		return
 	}
+
 	// find median offset from all peers
 	select {
 	case syncLock <- struct{}{}:
@@ -242,7 +249,9 @@ func (p *peer) run(pctx context.Context) {
 			p.interval = minInterval
 		}
 		p.interval += randDuration()
-		Debug.Printf("%s will sleep %s", p.addr, p.interval)
+		if debug {
+			log.Printf("%s will sleep %s", p.addr, p.interval)
+		}
 		timer = time.NewTimer(p.interval)
 		select {
 		case <-timer.C:
@@ -289,7 +298,9 @@ func (p *peer) checkFilter() (valid bool) {
 	p.referId = r.resp.ReferenceID
 	p.stratum = r.resp.Stratum
 	p.updateAt = time.Now()
-	Debug.Printf("%s choice new filter %d offset=%s", p.addr, bestIndex, p.offset)
+	if debug {
+		log.Printf("%s choice new filter %d offset=%s", p.addr, bestIndex, p.offset)
+	}
 	valid = true
 	return
 }

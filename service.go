@@ -22,6 +22,8 @@ var (
 )
 
 func NewService(cfg *Config) (s *Service, err error) {
+	cfg.log()
+
 	addr, err := net.ResolveUDPAddr("udp", cfg.Listen)
 	if err != nil {
 		return nil, err

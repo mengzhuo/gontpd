@@ -26,6 +26,7 @@ func main() {
 		gontpd.Info = nilLogger
 		gontpd.Warn = nilLogger
 	}
+	gontpd.Info.Print("starting gontpd")
 
 	cfg, err := gontpd.NewConfigFromFile(*fp)
 	if err != nil {

@@ -16,6 +16,15 @@ type Config struct {
 	ReqRateSec int      `yaml:"rate"`
 }
 
+func (c *Config) log() {
+	Info.Printf("listen: %s", c.Listen)
+	Info.Printf("export: %s", c.ExpoMetric)
+	Info.Printf("geoDB : %s", c.GeoDB)
+	Info.Printf("worker: %d", c.WorkerNum)
+	Info.Printf("rate  : %d", c.ReqRateSec)
+	Info.Printf("srv   : %v", c.ServerList)
+}
+
 func NewConfigFromFile(s string) (cfg *Config, err error) {
 
 	var data []byte
@@ -28,6 +37,5 @@ func NewConfigFromFile(s string) (cfg *Config, err error) {
 	if cfg.WorkerNum == 0 {
 		cfg.WorkerNum = runtime.NumCPU()
 	}
-	Info.Printf("%#v", cfg)
 	return
 }

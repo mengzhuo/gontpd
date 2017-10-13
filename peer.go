@@ -1,32 +1,25 @@
 package gontpd
 
 import (
-	"context"
+	"crypto/md5"
 	"fmt"
 	"log"
-	"math/bits"
+	"math/rand"
+	"net"
+	"sort"
+	"sync"
 	"time"
 
 	"github.com/beevik/ntp"
 )
 
 const (
-	ReplyCount           = 8
-	MaxRootDelay         = 10 * time.Second
-	MaxStratum     uint8 = 15
-	minFilterCount       = 3
-	maxInterval          = 1024 * time.Second
-	minInterval          = 4 * time.Second
-	reachStable    uint8 = 1<<8 - 1
-	phi                  = 15 * time.Microsecond
-)
+	offsetSize = 8
 
-const (
-	stateInit = iota
-	stateInvalid
-	stateTemporaryDown
-	stateSyncing
-	stateStable
+	trustlevelBadpeer    = 6
+	trustlevelPathetic   = 2
+	trustlevelAggressive = 8
+	trustlevelMax        = 10
 )
 
 const (
@@ -37,9 +30,46 @@ const (
 )
 
 const (
-	queryMinInterval = 5 * time.Second
-	queryMaxInterval = (1 << 12) * time.Minute
+	intervalQueryNormal     = 30 * time.Second /* sync to peers every n secs */
+	intervalQueryPathetic   = 60 * time.Second
+	intervalQueryAggressive = 5 * time.Second
+	qScaleOffMax            = 50 * time.Millisecond
+	qScaleOffMin            = time.Millisecond
 )
+
+const (
+	stateNone peerState = iota
+	stateNetworkTempfail
+	stateQuerySent
+	stateReplyReceived
+	stateTimeout
+	stateInvalid
+)
+
+type peerState uint8
+
+type ntpStatus struct {
+	rootDelay      time.Duration
+	rootDispersion time.Duration
+	refTime        time.Time
+	refId          uint32
+	sendrefId      uint32
+	synced         uint8
+	leap           uint8
+	percision      int8
+	poll           uint8
+	stratum        uint8
+}
+
+type ntpOffset struct {
+	status ntpStatus
+	offset time.Duration
+	delay  time.Duration
+	err    time.Duration
+	// received
+	rcvd time.Time
+	good bool
+}
 
 var (
 	peerTransTable []peerTransitionFunc
@@ -48,276 +78,265 @@ var (
 
 type peer struct {
 	addr       string
-	filter     [ReplyCount]*filter
-	referTime  time.Time
-	updateAt   time.Time
-	interval   time.Duration
-	offset     time.Duration
-	delay      time.Duration
-	rootDelay  time.Duration
-	rootDisp   time.Duration
-	dispersion time.Duration
-
-	filterIndex int
-	best        int
-	queryCount  int
-	referId     uint32
-	poll        int8
-	leap        uint8
-	reach       uint8
-	stratum     uint8
-	state       uint8
+	reply      [offsetSize]*ntpOffset
+	update     *ntpOffset
+	next       time.Duration
+	deadline   time.Time
+	poll       time.Time
+	lastErrors int
+	sendErrors int
+	id         uint32
+	shift      uint8
+	trustLevel uint8
+	state      peerState
+	sync.Mutex
 }
-
-type filter struct {
-	updateAt   time.Time
-	offset     time.Duration
-	delay      time.Duration
-	dispersion time.Duration
-	resp       *ntp.Response
-}
-
-func peerInit(p *peer, resp *ntp.Response, err error) {
-	if p.queryCount < minFilterCount {
-		// keep init
-		if debug {
-			log.Printf("query Count:%d keep initing", p.queryCount)
-		}
-		return
-	}
-
-	if p.reach > 1 {
-		p.state = stateSyncing
-		Info.Printf("%s init -> syncing", p.addr)
-		return
-	}
-
-	Warn.Printf("peer:%s has no good query while initing", p.addr)
-	p.state = stateInvalid
-	Info.Printf("%s init -> invalid", p.addr)
-}
-
-func peerInvalid(p *peer, resp *ntp.Response, err error) {
-	Error.Fatal("we should not go into here")
-}
-
-func peerTemporaryDown(p *peer, resp *ntp.Response, err error) {
-	Info.Printf("%s temporary down", p.addr)
-	if p.reach&3 != 0 {
-		p.state = stateSyncing
-		Info.Printf("%s down -> syncing", p.addr)
-		return
-	}
-
-	p.interval = time.Duration(8-bits.OnesCount8(p.reach)) * time.Minute
-}
-
-func peerSyncing(p *peer, resp *ntp.Response, err error) {
-	if p.reach&3 == 0 {
-		p.state = stateTemporaryDown
-		Info.Printf("%s syncing -> temporary down", p.addr)
-		p.interval = minInterval
-		return
-	}
-
-	if p.reach == reachStable {
-		Info.Printf("%s syncing -> stable", p.addr)
-		p.state = stateStable
-	}
-
-	if p.checkFilter() {
-		syncClock(p)
-	}
-	p.interval = time.Duration(bits.OnesCount8(p.reach)) * (10 * time.Second)
-}
-func peerStable(p *peer, resp *ntp.Response, err error) {
-
-	if err != nil || p.reach != reachStable {
-		p.state = stateSyncing
-		Info.Printf("%s stable -> syncing", p.addr)
-		return
-	}
-
-	if p.checkFilter() {
-		syncClock(p)
-	}
-	// offset     interval
-	// 0.128s  -> 1024s
-	// 0.005s  -> 4s
-	p.interval = secondToDuration(absDuration(p.offset).Seconds()*-8992.68 + 1065.46)
-}
-
-func syncClock(p *peer) {
-
-	if debug {
-		log.Printf("syncClock to:%s, offset:%s", p.addr, p.offset)
-	}
-
-	// find median offset from all peers
-	select {
-	case syncLock <- struct{}{}:
-	default:
-	}
-}
-
-func init() {
-	peerTransTable = []peerTransitionFunc{
-		stateInit:          peerInit,
-		stateInvalid:       peerInvalid,
-		stateTemporaryDown: peerTemporaryDown,
-		stateSyncing:       peerSyncing,
-		stateStable:        peerStable,
-	}
-}
-
-type peerTransitionFunc func(*peer, *ntp.Response, error)
 
 func newPeer(addr string) *peer {
 	p := &peer{
 		addr:       addr,
-		interval:   queryMinInterval,
-		best:       -1,
-		offset:     time.Duration(0),
-		delay:      time.Minute,
-		dispersion: time.Minute,
+		trustLevel: trustlevelPathetic,
+		state:      stateNone,
 	}
-	for i := 0; i < ReplyCount; i++ {
-		p.filter[i] = &filter{
-			updateAt:   epoch,
-			dispersion: MaxRootDelay,
-			delay:      MaxRootDelay,
-			offset:     MaxRootDelay,
-		}
+	for i := 0; i < offsetSize; i++ {
+		p.reply[i] = &ntpOffset{}
 	}
 	return p
 }
 
-func (p *peer) insertFilter(resp *ntp.Response) {
-	// the fisrt filter is the newest
-	for i := ReplyCount - 1; i > 0; i-- {
-		if p.filter[i].updateAt.Equal(epoch) {
-			continue
-		}
-		interval := time.Now().Sub(p.filter[i].updateAt)
-		p.filter[i] = p.filter[i-1]
-		p.filter[i].updateAt = time.Now()
-		p.filter[i].dispersion += phi * interval // add up dispersion
-	}
-	p.filter[0].delay = resp.RTT + resp.RootDelay
-	p.filter[0].offset = resp.ClockOffset
-	p.filter[0].updateAt = time.Now()
-	p.filter[0].dispersion = resp.RootDispersion + p.filter[0].delay/2
-	p.filter[0].resp = resp
-}
-
-func (p *peer) run(pctx context.Context) {
-	ctx, cancel := context.WithCancel(pctx)
-	defer cancel()
-
-	Info.Printf("%s started %s", p.addr, p.interval)
-	defer Info.Printf("%s stopped", p.addr)
-
-	var timer *time.Timer
+func (s *Service) run(p *peer) {
 
 	for {
-		resp, err := ntp.Query(p.addr)
-		p.reach <<= 1
-		p.queryCount++
-		if err == nil && resp != nil && resp.Validate() == nil {
-			p.reach |= 1
-			p.insertFilter(resp)
-		} else {
-			Warn.Print(err)
-			if resp != nil {
-				Warn.Print(resp.Validate(), resp)
-			}
+		resp, err := p.query()
+		if err == nil && resp != nil {
+			s.dispatch(p, resp)
 		}
-
-		peerTransTable[p.state](p, resp, err)
-
-		if p.state == stateInvalid {
-			Warn.Printf("peer %s invalid, exited looping", p.addr)
-			return
-		}
-		if p.interval > maxInterval {
-			p.interval = maxInterval
-		}
-		if p.interval < minInterval {
-			p.interval = minInterval
-		}
-		p.interval += randDuration()
-		if debug {
-			log.Printf("%s will sleep %s", p.addr, p.interval)
-		}
-		timer = time.NewTimer(p.interval)
-		select {
-		case <-timer.C:
-		case <-ctx.Done():
-			return
-		}
-		timer.Stop()
+		time.Sleep(p.next)
 	}
+
+	return
 }
 
-func (p *peer) checkFilter() (valid bool) {
+func (p *peer) query() (resp *ntp.Response, err error) {
+	p.Lock()
+	defer p.Unlock()
 
-	bestIndex := -1
-	bestDisp := time.Minute
-	validCount := 0
-
-	for i, r := range p.filter {
-		if r == nil {
-			continue
-		}
-		if r.dispersion >= MaxRootDelay {
-			continue
-		}
-		validCount += 1
-		if r.dispersion < bestDisp {
-			bestIndex = i
-		}
+	resp, err = ntp.Query(p.addr)
+	if err != nil {
+		Warn.Print(err)
+		p.state = stateNetworkTempfail
+		p.setNext(intervalQueryPathetic)
+		return
 	}
+	if debug {
+		log.Printf("%s -> %v, err:%s", p.addr, resp, err)
+	}
+	return
+}
 
-	if validCount == 0 {
-		valid = false
+func (s *Service) dispatch(p *peer, resp *ntp.Response) {
+	p.Lock()
+	defer p.Unlock()
+
+	if resp.Validate() != nil {
+		p.next = errorInterval()
 		return
 	}
 
-	p.best = bestIndex
-	r := p.filter[bestIndex]
-	p.dispersion = r.dispersion
-	p.delay = r.delay + r.resp.RootDelay
-	p.rootDelay = r.resp.RootDelay + r.resp.RTT
-	p.rootDisp = r.resp.RootDispersion
-	p.offset = r.resp.ClockOffset
-	p.interval = r.resp.Poll
-	p.referTime = time.Now()
-	p.referId = r.resp.ReferenceID
-	p.stratum = r.resp.Stratum
-	p.updateAt = time.Now()
-	if debug {
-		log.Printf("%s choice new filter %d offset=%s", p.addr, bestIndex, p.offset)
+	// TODO: detect liars
+
+	p.reply[p.shift].offset = resp.ClockOffset
+	p.reply[p.shift].delay = resp.RTT
+	p.reply[p.shift].status.stratum = resp.Stratum
+	if resp.RTT < 0 {
+		Warn.Printf("%s got neg rtt:%s", p.addr, resp.RTT)
+		p.next = errorInterval()
+		return
 	}
-	valid = true
+
+	p.reply[p.shift].err = resp.MinError
+	p.reply[p.shift].rcvd = time.Now()
+	p.reply[p.shift].good = true
+
+	p.reply[p.shift].status.leap = resp.Leap
+	p.reply[p.shift].status.percision = resp.Precision
+	p.reply[p.shift].status.rootDelay = resp.RootDelay
+	p.reply[p.shift].status.rootDispersion = resp.RootDispersion
+	p.reply[p.shift].status.refId = resp.ReferenceID
+	p.reply[p.shift].status.refTime = resp.ReferenceTime
+	p.reply[p.shift].status.poll = resp.Poll
+	p.reply[p.shift].status.sendRefId = p.makeSendRefId()
+
+	interval := intervalQueryPathetic
+	if p.trustLevel < trustlevelPathetic {
+		interval = s.scaleInterval(intervalQueryPathetic)
+	} else if p.trustLevel < trustlevelAggressive {
+		interval = s.scaleInterval(intervalQueryAggressive)
+	} else {
+		interval = s.scaleInterval(intervalQueryNormal)
+	}
+
+	p.setNext(interval)
+
+	if p.trustLevel < trustlevelMax {
+		if p.trustLevel < trustlevelBadpeer &&
+			p.trustLevel+1 >= trustlevelBadpeer {
+			Info.Printf("peer %s now valid", p.addr)
+		}
+		p.trustLevel++
+	}
+
+	if debug {
+		log.Printf("reply from:%s, offset:%s delay:%s",
+			p.addr,
+			p.reply[p.shift].offset,
+			p.reply[p.shift].delay,
+		)
+		log.Printf("%s will query at %s", p.addr, interval)
+	}
+
+	p.clockFilter()
+}
+
+func (p *peer) makeSendRefId() (id uint32) {
+
+	addrs, err := net.LookupHost(p.addr)
+	if err != nil {
+		Warn.Print(err)
+		return
+	}
+
+	if len(addrs) == 0 {
+		return
+	}
+
+	ip := net.ParseIP(addrs[0])
+
+	if ip[11] == 255 {
+		// ipv4
+		id = uint32(ip[12])<<24 + uint32(ip[13])<<16 + uint32(ip[14])<<8 + uint32(ip[15])
+	} else {
+		h := md5.New()
+		hr := h.Sum(ip)
+		// 255.b2.b3.b4 for ipv6 hash
+		// https://support.ntp.org/bin/view/Dev/UpdatingTheRefidFormat
+		id = uint32(255)<<24 + uint32(hr[1])<<16 + uint32(hr[2])<<8 + uint32(hr[3])
+	}
+	return
+}
+
+func (p *peer) clockFilter() (err error) {
+	/*
+	 * find the offset which arrived with the lowest delay
+	 * use that as the peer update
+	 * invalidate it and all older ones
+	 */
+	var best, good int
+
+	for i, r := range p.reply {
+		if r.good {
+			good++
+			best = i
+		}
+	}
+
+	for i := best; i < len(p.reply); i++ {
+		if p.reply[i].good {
+			good++
+			if p.reply[i].delay < p.reply[best].delay {
+				best = i
+			}
+		}
+	}
+
+	if good < 8 {
+		return fmt.Errorf("peer:%s not good enough:%d", p.addr, good)
+	}
+
+	*p.update = *p.reply[best]
+
+	if s.privAjdtime() == nil {
+		for i, r := range p.reply {
+			if !r.rcvd.After(p.reply[best].rcvd) {
+				p.reply[i].good = false
+			}
+		}
+	}
+	return
+}
+
+func (s *Service) privAjdtime() (err error) {
+	offsets := []*ntpOffset{}
+	for i, p := range s.peerList {
+		if !p.update.good {
+			continue
+		}
+		offsets = append(offsets, p.update)
+	}
+
+	sort.Sort(byOffset(offsets))
+
+	i := len(offsets) / 2
+	if len(offsets)%2 == 0 {
+		if offsets[i-1].delay < offsets[i].delay {
+			i -= 1
+		}
+	}
+
+	offsetMedian := offsets[i].offset
+	s.status.rootDelay = offsets[i].delay
+	s.status.stratum = offsets[i].status.stratum
+	s.status.leap = offsets[i].status.leap
+
+	privAdjFreq(offsetMedian)
+
+	s.status.refTime = time.Now()
+	s.status.stratum++
+	if s.status.stratum > maxStratum {
+		s.status.stratum = maxStratum
+	}
+
+	s.updateScale(offsetMedian)
+	s.status.refId = offsets[i].status.sendrefId
+
+	for _, p := range s.peerList {
+		for j := 0; j < len(p.reply); j++ {
+			p.reply[j].offset -= offsetMedian
+		}
+		p.update.good = false
+	}
 	return
 }
 
 func (p *peer) String() string {
-	return fmt.Sprintf("%s[%s]%s", p.addr, stateToString(p.state), p.offset)
+	return fmt.Sprintf("%s [%d]", p.addr, p.state)
 }
 
-func stateToString(u uint8) string {
-	switch u {
-	case stateInit:
-		return "Init"
-	case stateStable:
-		return "stable"
-	case stateInvalid:
-		return "invalid"
-	case stateTemporaryDown:
-		return "down"
-	case stateSyncing:
-		return "syncing"
-	}
-	return "unknown"
+func (p *peer) setNext(d time.Duration) {
+	p.next = d + time.Duration(rand.Int63n(int64(d)/10))
+}
+
+func (s *Service) scaleInterval(d time.Duration) (sd time.Duration) {
+	sd = d
+	//sd = s.scale * d
+	r := maxDuration(5*time.Second, sd/10)
+	return sd + r
+}
+
+func errorInterval() time.Duration {
+	return time.Duration(rand.Int63n(int64(intervalQueryPathetic*qScaleOffMax/qScaleOffMin)) / 10)
+}
+
+type byOffset []*ntpOffset
+
+func (ol byOffset) Len() int {
+	return len(ol)
+}
+
+func (ol byOffset) Swap(i, j int) {
+	ol[i], ol[j] = ol[j], ol[i]
+}
+
+func (ol byOffset) Less(i, j) bool {
+	return ol[i].offset < ol[j].offset
 }

@@ -51,8 +51,7 @@ type Service struct {
 	stats    *statistic
 	cfg      *Config
 	template []byte
-	interval time.Duration
-	poll     int8
+	status   *ntpStatus
 }
 
 func (s *Service) serveSyncLock() (err error) {

@@ -5,10 +5,6 @@ import (
 	"os"
 )
 
-const (
-	NoSyncClock = 1 + iota
-)
-
 var (
 	Info  *log.Logger
 	Warn  *log.Logger

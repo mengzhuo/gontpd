@@ -149,11 +149,8 @@ func peerStable(p *peer, resp *ntp.Response, err error) {
 
 func syncClock(p *peer) {
 
-	if NoSyncClock != 0 {
-		if debug {
-			log.Printf("syncClock to:%s, offset:%s", p.addr, p.offset)
-		}
-		return
+	if debug {
+		log.Printf("syncClock to:%s, offset:%s", p.addr, p.offset)
 	}
 
 	// find median offset from all peers

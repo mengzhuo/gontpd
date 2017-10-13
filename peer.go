@@ -77,8 +77,7 @@ type ntpOffset struct {
 }
 
 var (
-	peerTransTable []peerTransitionFunc
-	epoch          = time.Unix(0, 0)
+	epoch = time.Unix(0, 0)
 )
 
 type peer struct {
@@ -324,7 +323,7 @@ func (s *Service) privAdjFreq(offset time.Duration) {
 
 func (s *Service) privAjdtime() (err error) {
 	offsets := []*ntpOffset{}
-	for i, p := range s.peerList {
+	for _, p := range s.peerList {
 		if !p.update.good {
 			continue
 		}
@@ -355,7 +354,7 @@ func (s *Service) privAjdtime() (err error) {
 
 	s.updateScale(offsetMedian)
 	s.status.refId = offsets[i].status.sendRefId
-
+	s.setTemplate(offsets[i])
 	for _, p := range s.peerList {
 		for j := 0; j < len(p.reply); j++ {
 			p.reply[j].offset -= offsetMedian

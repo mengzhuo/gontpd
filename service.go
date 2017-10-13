@@ -1,10 +1,7 @@
 package gontpd
 
 import (
-	"context"
-	"log"
 	"net"
-	"sort"
 	"time"
 )
 
@@ -14,11 +11,6 @@ const (
 	maxPoll   = 8
 	maxAdjust = 128 * time.Millisecond
 	initRefer = 0x494e4954 // ascii for INIT
-)
-
-var (
-	// the only data global variable
-	syncLock = make(chan struct{})
 )
 
 func NewService(cfg *Config) (s *Service, err error) {
@@ -67,128 +59,30 @@ type Service struct {
 
 func (s *Service) serveSyncLock() (err error) {
 
-	var (
-		lock  uint8
-		timer *time.Timer
-	)
-	s.interval = 30 * time.Second
-	timer = time.NewTimer(s.interval)
-
-	for {
-		select {
-		case <-syncLock:
-			lock |= 1
-		case <-timer.C:
-			lock |= 2
-		}
-		if lock != 3 {
-			continue
-		}
-
-		err = s.syncClock()
-		if err != nil {
-			return
-		}
-		if !timer.Stop() {
-			select {
-			case <-timer.C:
-			default:
-			}
-		}
-		timer.Reset(s.interval)
-		lock = 0
-	}
 	return
 }
 
-func (s *Service) syncClock() (err error) {
-	availablePeers := []*peer{}
-	for _, p := range s.peerList {
-		if p.state < stateSyncing {
-			if debug {
-				log.Printf("%s state not Syncing", p.addr)
-			}
-			continue
-		}
-		if p.stratum >= 15 {
-			if debug {
-				log.Printf("%s stratum is bad", p.addr)
-			}
-			continue
-		}
-		if p.delay >= MaxRootDelay {
-			if debug {
-				log.Printf("%s delay %s >= MaxRootDelay %s", p.addr, p.delay, MaxRootDelay)
-			}
-			continue
-		}
-		availablePeers = append(availablePeers, p)
-	}
+func (s *Service) setTemplate(no *ntpOffset) {
 
-	switch len(availablePeers) {
-	case 0:
-		Warn.Print("no availablePeers")
-		return nil
-	case 1:
-		s.setParams(availablePeers[0])
-		return s.setOffset(availablePeers[0])
-	default:
-		sort.Sort(byOffset(availablePeers))
-		if debug {
-			log.Printf("availablePeers %d", len(availablePeers))
-		}
-		for _, p := range availablePeers {
-			if debug {
-				log.Printf(" |-- %s", p)
-			}
-		}
-		bestPeer := availablePeers[len(availablePeers)/2]
-		s.setParams(bestPeer)
-		return s.setOffset(bestPeer)
-	}
-}
-
-func (s *Service) setParams(p *peer) {
-
-	SetLi(s.template, p.leap)
+	SetLi(s.template, s.status.leap)
 	SetVersion(s.template, 4)
 	SetMode(s.template, ModeServer)
 
-	SetUint8(s.template, Stratum, p.stratum+1)
-
+	SetUint8(s.template, Stratum, s.status.stratum)
 	SetInt8(s.template, ClockPrecision, systemPrecision())
-
-	SetUint32(s.template, RootDelayPos, toNtpShortTime(p.delay))
+	SetUint32(s.template, RootDelayPos, toNtpShortTime(s.status.rootDelay))
 
 	if s.stats != nil {
-		s.stats.delayGauge.Set(p.delay.Seconds())
-		s.stats.offsetGauge.Set(p.offset.Seconds())
-		s.stats.dispGauge.Set(p.dispersion.Seconds())
+		s.stats.delayGauge.Set(no.delay.Seconds())
+		s.stats.offsetGauge.Set(no.offset.Seconds())
+		s.stats.dispGauge.Set(no.err.Seconds())
 	}
 
-	SetUint32(s.template, RootDispersionPos, toNtpShortTime(p.dispersion))
-	SetUint64(s.template, ReferenceTimeStamp, toNtpTime(p.updateAt))
-	SetUint32(s.template, ReferIDPos, p.referId)
+	SetUint32(s.template, RootDispersionPos, toNtpShortTime(s.status.rootDispersion))
+	SetUint64(s.template, ReferenceTimeStamp, toNtpTime(s.status.refTime))
+	SetUint32(s.template, ReferIDPos, s.status.sendRefId)
 
-	switch p.state {
-	case stateStable:
-		s.interval = maxInterval
-	case stateSyncing:
-		s.interval = p.interval * 2
-	default:
-		s.interval = 30 * time.Second
-	}
-	s.poll = int8(durationToPoll(s.interval))
-	if debug {
-		log.Printf("try to set poll %d, by %s", s.poll, s.interval)
-	}
-	if s.poll > maxPoll {
-		s.poll = maxPoll
-	}
-	if s.poll < minPoll {
-		s.poll = minPoll
-	}
-	SetInt8(s.template, Poll, s.poll)
+	SetInt8(s.template, Poll, int8(s.status.poll))
 }
 
 func (s *Service) workerDo(i int) {
@@ -275,9 +169,8 @@ func (s *Service) Serve() error {
 		s.stats = newStatistic(s.cfg)
 	}
 
-	ctx := context.TODO()
 	for _, p := range s.peerList {
-		go p.run(ctx)
+		go s.run(p)
 	}
 
 	for i := 0; i < s.cfg.WorkerNum; i++ {

@@ -48,3 +48,7 @@ func randDuration() time.Duration {
 func durationToPoll(t time.Duration) int8 {
 	return int8(math.Log2(absDuration(t).Seconds()))
 }
+
+func reverseToInterval(d time.Duration) int8 {
+	return int8(math.Log2(d.Seconds()))
+}

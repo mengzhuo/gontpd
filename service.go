@@ -45,6 +45,14 @@ func NewService(cfg *Config) (s *Service, err error) {
 	return
 }
 
+type ntpFreq struct {
+	overallOffset time.Duration
+	x, y          float64
+	xx, xy        float64
+	samples       int
+	num           uint
+}
+
 type Service struct {
 	peerList []*peer
 	conn     *net.UDPConn
@@ -52,6 +60,9 @@ type Service struct {
 	cfg      *Config
 	template []byte
 	status   *ntpStatus
+	freq     *ntpFreq
+	scale    time.Duration
+	filters  uint8
 }
 
 func (s *Service) serveSyncLock() (err error) {
@@ -178,20 +189,6 @@ func (s *Service) setParams(p *peer) {
 		s.poll = minPoll
 	}
 	SetInt8(s.template, Poll, s.poll)
-}
-
-type byOffset []*peer
-
-func (b byOffset) Len() int {
-	return len(b)
-}
-
-func (b byOffset) Swap(i, j int) {
-	b[i], b[j] = b[j], b[i]
-}
-
-func (b byOffset) Less(i, j int) bool {
-	return b[i].offset < b[j].offset
 }
 
 func (s *Service) workerDo(i int) {

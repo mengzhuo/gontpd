@@ -35,6 +35,11 @@ const (
 	intervalQueryAggressive = 5 * time.Second
 	qScaleOffMax            = 50 * time.Millisecond
 	qScaleOffMin            = time.Millisecond
+
+	frequencySamples           = 8
+	maxFrequencyAdjust float64 = 128e-5
+	maxStratum                 = 16
+	filterAdjFreq              = 0x01
 )
 
 const (
@@ -53,8 +58,8 @@ type ntpStatus struct {
 	rootDispersion time.Duration
 	refTime        time.Time
 	refId          uint32
-	sendrefId      uint32
-	synced         uint8
+	sendRefId      uint32
+	synced         bool
 	leap           uint8
 	percision      int8
 	poll           uint8
@@ -158,13 +163,13 @@ func (s *Service) dispatch(p *peer, resp *ntp.Response) {
 	p.reply[p.shift].rcvd = time.Now()
 	p.reply[p.shift].good = true
 
-	p.reply[p.shift].status.leap = resp.Leap
-	p.reply[p.shift].status.percision = resp.Precision
+	p.reply[p.shift].status.leap = uint8(resp.Leap)
+	p.reply[p.shift].status.percision = reverseToInterval(resp.Precision)
 	p.reply[p.shift].status.rootDelay = resp.RootDelay
 	p.reply[p.shift].status.rootDispersion = resp.RootDispersion
 	p.reply[p.shift].status.refId = resp.ReferenceID
 	p.reply[p.shift].status.refTime = resp.ReferenceTime
-	p.reply[p.shift].status.poll = resp.Poll
+	p.reply[p.shift].status.poll = uint8(durationToPoll(resp.Poll))
 	p.reply[p.shift].status.sendRefId = p.makeSendRefId()
 
 	interval := intervalQueryPathetic
@@ -195,7 +200,7 @@ func (s *Service) dispatch(p *peer, resp *ntp.Response) {
 		log.Printf("%s will query at %s", p.addr, interval)
 	}
 
-	p.clockFilter()
+	s.clockFilter(p)
 }
 
 func (p *peer) makeSendRefId() (id uint32) {
@@ -225,7 +230,7 @@ func (p *peer) makeSendRefId() (id uint32) {
 	return
 }
 
-func (p *peer) clockFilter() (err error) {
+func (s *Service) clockFilter(p *peer) (err error) {
 	/*
 	 * find the offset which arrived with the lowest delay
 	 * use that as the peer update
@@ -262,7 +267,59 @@ func (p *peer) clockFilter() (err error) {
 			}
 		}
 	}
+	p.shift++
+	if p.shift >= offsetSize {
+		p.shift = 0
+	}
+
 	return
+}
+
+func (s *Service) privAdjFreq(offset time.Duration) {
+	var currentTime, freq float64
+
+	if !s.status.synced {
+		s.freq.samples = 0
+		return
+	}
+
+	s.freq.samples++
+
+	if s.freq.samples <= 0 {
+		return
+	}
+
+	s.freq.overallOffset += offset
+	offset = s.freq.overallOffset
+
+	currentTime = gettimeCorrected()
+
+	s.freq.xy += offset.Seconds() * currentTime
+	s.freq.x += currentTime
+	s.freq.y += offset.Seconds()
+	s.freq.xx += currentTime * currentTime
+
+	if s.freq.samples%frequencySamples != 0 {
+		return
+	}
+
+	freq = (s.freq.xy - s.freq.x*s.freq.y/float64(s.freq.samples)) /
+		(s.freq.xx - s.freq.x*s.freq.x/float64(s.freq.samples))
+
+	if freq > maxFrequencyAdjust {
+		freq = maxFrequencyAdjust
+	} else if freq < -maxFrequencyAdjust {
+		freq = -maxFrequencyAdjust
+	}
+
+	s.filters |= filterAdjFreq
+	s.freq.xy = 0
+	s.freq.x = 0
+	s.freq.y = 0
+	s.freq.xx = 0
+	s.freq.samples = 0
+	s.freq.overallOffset = 0
+	s.freq.num++
 }
 
 func (s *Service) privAjdtime() (err error) {
@@ -288,7 +345,7 @@ func (s *Service) privAjdtime() (err error) {
 	s.status.stratum = offsets[i].status.stratum
 	s.status.leap = offsets[i].status.leap
 
-	privAdjFreq(offsetMedian)
+	s.privAdjFreq(offsetMedian)
 
 	s.status.refTime = time.Now()
 	s.status.stratum++
@@ -297,7 +354,7 @@ func (s *Service) privAjdtime() (err error) {
 	}
 
 	s.updateScale(offsetMedian)
-	s.status.refId = offsets[i].status.sendrefId
+	s.status.refId = offsets[i].status.sendRefId
 
 	for _, p := range s.peerList {
 		for j := 0; j < len(p.reply); j++ {
@@ -306,6 +363,21 @@ func (s *Service) privAjdtime() (err error) {
 		p.update.good = false
 	}
 	return
+}
+
+func (s *Service) updateScale(offset time.Duration) {
+	offset += getOffset()
+	if offset < 0 {
+		offset = -offset
+	}
+
+	if offset > qScaleOffMax || !s.status.synced || s.freq.num < 3 {
+		s.scale = time.Duration(1)
+	} else if offset < qScaleOffMin {
+		s.scale = qScaleOffMax / qScaleOffMin
+	} else {
+		s.scale = qScaleOffMax / offset
+	}
 }
 
 func (p *peer) String() string {
@@ -317,8 +389,7 @@ func (p *peer) setNext(d time.Duration) {
 }
 
 func (s *Service) scaleInterval(d time.Duration) (sd time.Duration) {
-	sd = d
-	//sd = s.scale * d
+	sd = s.scale * d
 	r := maxDuration(5*time.Second, sd/10)
 	return sd + r
 }
@@ -337,6 +408,6 @@ func (ol byOffset) Swap(i, j int) {
 	ol[i], ol[j] = ol[j], ol[i]
 }
 
-func (ol byOffset) Less(i, j) bool {
+func (ol byOffset) Less(i, j int) bool {
 	return ol[i].offset < ol[j].offset
 }

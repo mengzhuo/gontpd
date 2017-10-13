@@ -8,28 +8,43 @@ import (
 	"time"
 )
 
-func (s *Service) setOffset(p *peer) (err error) {
+func gettimeCorrected() float64 {
+	return float64(time.Now().UnixNano())*1e9 + getOffset().Seconds()
+}
 
-	Info.Printf("set offset from :%s offset=%s", p.addr, p.offset)
+func getOffset() (offset time.Duration) {
+	tmx := &syscall.Timex{
+		Status: STA_PLL,
+	}
+	rc, err := syscall.Adjtimex(tmx)
+	if rc == -1 {
+		Error.Printf("get offset failed:%d, %s", rc, err)
+		return
+	}
+	offset = time.Duration(tmx.Offset)
+	return
+}
+
+func (s *Service) setOffset(no *ntpOffset) (err error) {
 
 	tmx := &syscall.Timex{}
-	offsetNsec := p.offset.Nanoseconds()
+	offsetNsec := no.offset.Nanoseconds()
 
-	if absDuration(p.offset) < maxAdjust {
+	if absDuration(no.offset) < maxAdjust {
+		Info.Printf("set offset slew offset=%s", no.offset)
 		tmx.Modes = ADJ_STATUS | ADJ_NANO | ADJ_OFFSET | ADJ_TIMECONST | ADJ_MAXERROR | ADJ_ESTERROR
 		tmx.Status = STA_PLL
 		tmx.Offset = offsetNsec
-		tmx.Constant = int64(s.poll)
+		tmx.Constant = int64(no.status.poll)
 		tmx.Maxerror = 0
 		tmx.Esterror = 0
 	} else {
-
-		Warn.Printf("settimeofday from %s = %s", p.addr, p.offset)
-		tv := syscall.NsecToTimeval(time.Now().Add(p.offset).UnixNano())
+		Warn.Printf("settimeofday from %s", no.offset)
+		tv := syscall.NsecToTimeval(time.Now().Add(no.offset).UnixNano())
 		return syscall.Settimeofday(&tv)
 	}
 
-	switch p.leap {
+	switch no.status.leap {
 	case LeapIns:
 		tmx.Status |= STA_INS
 	case LeapDel:

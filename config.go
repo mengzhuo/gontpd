@@ -2,7 +2,6 @@ package gontpd
 
 import (
 	"io/ioutil"
-	"runtime"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -35,7 +34,7 @@ func NewConfigFromFile(s string) (cfg *Config, err error) {
 	cfg = &Config{}
 	err = yaml.Unmarshal(data, cfg)
 	if cfg.WorkerNum == 0 {
-		cfg.WorkerNum = runtime.NumCPU()
+		cfg.Listen = ""
 	}
 	return
 }

@@ -17,10 +17,6 @@ const (
 func NewService(cfg *Config) (s *Service, err error) {
 	cfg.log()
 
-	addr, err := net.ResolveUDPAddr("udp", cfg.Listen)
-	if err != nil {
-		return nil, err
-	}
 	s = &Service{
 		cfg:      cfg,
 		scale:    time.Duration(1),
@@ -28,9 +24,16 @@ func NewService(cfg *Config) (s *Service, err error) {
 		freq:     &ntpFreq{},
 		updateAt: time.Now(),
 	}
-	s.conn, err = net.ListenUDP("udp", addr)
-	if err != nil {
-		return
+
+	if cfg.Listen != "" {
+		addr, err := net.ResolveUDPAddr("udp", cfg.Listen)
+		if err != nil {
+			return nil, err
+		}
+		s.conn, err = net.ListenUDP("udp", addr)
+		if err != nil {
+			return
+		}
 	}
 
 	for _, paddr := range cfg.ServerList {
@@ -175,9 +178,11 @@ func (s *Service) Serve() {
 		go s.run(p, &wg)
 	}
 
-	for i := 0; i < s.cfg.WorkerNum; i++ {
-		wg.Add(1)
-		go s.workerDo(i)
+	if s.cfg.Listen != "" {
+		for i := 0; i < s.cfg.WorkerNum; i++ {
+			wg.Add(1)
+			go s.workerDo(i)
+		}
 	}
 	wg.Wait()
 }

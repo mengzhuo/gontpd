@@ -2,6 +2,7 @@ package gontpd
 
 import (
 	"net"
+	"os"
 	"time"
 )
 
@@ -21,7 +22,8 @@ func NewService(cfg *Config) (s *Service, err error) {
 		return nil, err
 	}
 	s = &Service{
-		cfg: cfg,
+		cfg:   cfg,
+		scale: time.Duration(1),
 	}
 	s.conn, err = net.ListenUDP("udp", addr)
 	if err != nil {
@@ -55,11 +57,6 @@ type Service struct {
 	freq     *ntpFreq
 	scale    time.Duration
 	filters  uint8
-}
-
-func (s *Service) serveSyncLock() (err error) {
-
-	return
 }
 
 func (s *Service) setTemplate(no *ntpOffset) {
@@ -163,7 +160,7 @@ func (s *Service) workerDo(i int) {
 	}
 }
 
-func (s *Service) Serve() error {
+func (s *Service) Serve(ch chan os.Signal) {
 
 	if s.cfg.ExpoMetric != "" {
 		s.stats = newStatistic(s.cfg)
@@ -176,8 +173,7 @@ func (s *Service) Serve() error {
 	for i := 0; i < s.cfg.WorkerNum; i++ {
 		go s.workerDo(i)
 	}
-
-	return s.serveSyncLock()
+	<-ch
 }
 
 func newTemplate() (t []byte) {

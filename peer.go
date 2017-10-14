@@ -133,7 +133,8 @@ func (p *peer) query() (resp *ntp.Response, err error) {
 		return
 	}
 	if debug {
-		log.Printf("%s -> %v, err:%s", p.addr, resp, err)
+		log.Printf("%s -> offset:%v, delay: %v err:%s",
+			p.addr, resp.ClockOffset, resp.RTT, err)
 	}
 	return
 }
@@ -172,6 +173,7 @@ func (s *Service) dispatch(p *peer, resp *ntp.Response) {
 	p.reply[p.shift].status.sendRefId = p.makeSendRefId()
 
 	interval := intervalQueryPathetic
+
 	if p.trustLevel < trustlevelPathetic {
 		interval = s.scaleInterval(intervalQueryPathetic)
 	} else if p.trustLevel < trustlevelAggressive {
@@ -191,12 +193,17 @@ func (s *Service) dispatch(p *peer, resp *ntp.Response) {
 	}
 
 	if debug {
+		log.Printf("%s trustLevel:%d", p.addr, p.trustLevel)
 		log.Printf("reply from:%s, offset:%s delay:%s",
 			p.addr,
 			p.reply[p.shift].offset,
 			p.reply[p.shift].delay,
 		)
 		log.Printf("%s will query at %s", p.addr, interval)
+	}
+	p.shift++
+	if p.shift >= offsetSize {
+		p.shift = 0
 	}
 
 	s.clockFilter(p)
@@ -235,6 +242,7 @@ func (s *Service) clockFilter(p *peer) (err error) {
 	 * use that as the peer update
 	 * invalidate it and all older ones
 	 */
+	// TODO good won't go up
 	var best, good int
 
 	for i, r := range p.reply {
@@ -252,6 +260,9 @@ func (s *Service) clockFilter(p *peer) (err error) {
 			}
 		}
 	}
+	if debug {
+		log.Printf("%s clockfilter: best:%d, good:%d", p, best, good)
+	}
 
 	if good < 8 {
 		return fmt.Errorf("peer:%s not good enough:%d", p.addr, good)
@@ -266,15 +277,12 @@ func (s *Service) clockFilter(p *peer) (err error) {
 			}
 		}
 	}
-	p.shift++
-	if p.shift >= offsetSize {
-		p.shift = 0
-	}
 
 	return
 }
 
 func (s *Service) privAdjFreq(offset time.Duration) {
+
 	var currentTime, freq float64
 
 	if !s.status.synced {
@@ -322,6 +330,11 @@ func (s *Service) privAdjFreq(offset time.Duration) {
 }
 
 func (s *Service) privAjdtime() (err error) {
+
+	if debug {
+		log.Print("privAdjtime")
+	}
+
 	offsets := []*ntpOffset{}
 	for _, p := range s.peerList {
 		if !p.update.good {
@@ -331,6 +344,10 @@ func (s *Service) privAjdtime() (err error) {
 	}
 
 	sort.Sort(byOffset(offsets))
+
+	if debug {
+		log.Print("got %d offset", len(offsets))
+	}
 
 	i := len(offsets) / 2
 	if len(offsets)%2 == 0 {

@@ -4,6 +4,8 @@ import (
 	"flag"
 	"io/ioutil"
 	"log"
+	"os"
+	"os/signal"
 
 	"github.com/mengzhuo/gontpd"
 )
@@ -36,5 +38,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Fatal(service.Serve())
+	ch := make(chan os.Signal)
+	signal.Notify(ch, os.Interrupt)
+	service.Serve(ch)
 }

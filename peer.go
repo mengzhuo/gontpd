@@ -101,6 +101,7 @@ func newPeer(addr string) *peer {
 		addr:       addr,
 		trustLevel: trustlevelPathetic,
 		state:      stateNone,
+		update:     &ntpOffset{},
 	}
 	for i := 0; i < offsetSize; i++ {
 		p.reply[i] = &ntpOffset{}
@@ -283,16 +284,26 @@ func (s *Service) clockFilter(p *peer) (err error) {
 
 func (s *Service) privAdjFreq(offset time.Duration) {
 
+	if debug {
+		log.Print("privAdjFreq")
+	}
+
 	var currentTime, freq float64
 
 	if !s.status.synced {
 		s.freq.samples = 0
+		if debug {
+			log.Print("not synced, return")
+		}
 		return
 	}
 
 	s.freq.samples++
 
 	if s.freq.samples <= 0 {
+		if debug {
+			log.Print("sample 0 return")
+		}
 		return
 	}
 
@@ -307,6 +318,9 @@ func (s *Service) privAdjFreq(offset time.Duration) {
 	s.freq.xx += currentTime * currentTime
 
 	if s.freq.samples%frequencySamples != 0 {
+		if debug {
+			log.Printf("sample %d %% %s !=0 ", s.freq.samples, frequencySamples)
+		}
 		return
 	}
 
@@ -346,7 +360,7 @@ func (s *Service) privAjdtime() (err error) {
 	sort.Sort(byOffset(offsets))
 
 	if debug {
-		log.Print("got %d offset", len(offsets))
+		log.Printf("got %d offset", len(offsets))
 	}
 
 	i := len(offsets) / 2
@@ -372,6 +386,7 @@ func (s *Service) privAjdtime() (err error) {
 	s.updateScale(offsetMedian)
 	s.status.refId = offsets[i].status.sendRefId
 	s.setTemplate(offsets[i])
+	s.status.synced = s.setOffset(offsets[i])
 	for _, p := range s.peerList {
 		for j := 0; j < len(p.reply); j++ {
 			p.reply[j].offset -= offsetMedian

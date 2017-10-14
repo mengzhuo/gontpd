@@ -1,12 +1,14 @@
 package gontpd
 
 import (
-	"fmt"
+	"log"
 	"math"
 	"strings"
 	"syscall"
 	"time"
 )
+
+var firstAdj bool = true
 
 func gettimeCorrected() float64 {
 	return float64(time.Now().UnixNano())*1e9 + getOffset().Seconds()
@@ -21,25 +23,34 @@ func getOffset() (offset time.Duration) {
 		Error.Printf("get offset failed:%d, %s", rc, err)
 		return
 	}
-	offset = time.Duration(tmx.Offset)
+	// 1us = 1000 ns
+	offset = time.Duration(tmx.Offset * 1000)
 	return
 }
 
-func (s *Service) setOffset(no *ntpOffset) (err error) {
+func (s *Service) setOffset(no *ntpOffset) (synced bool) {
+
+	if debug {
+		log.Printf("set offset %v", no.offset)
+	}
+
+	d := no.offset
+	old := getOffset()
+	d += old
 
 	tmx := &syscall.Timex{}
-	offsetNsec := no.offset.Nanoseconds()
+	offsetNsec := d.Nanoseconds()
 
-	if absDuration(no.offset) < maxAdjust {
+	if absDuration(d) < maxAdjust {
 		Info.Printf("set offset slew offset=%s", no.offset)
-		tmx.Modes = ADJ_STATUS | ADJ_NANO | ADJ_OFFSET | ADJ_TIMECONST | ADJ_MAXERROR | ADJ_ESTERROR
+		tmx.Modes = ADJ_STATUS | ADJ_NANO | ADJ_OFFSET | ADJ_MAXERROR | ADJ_ESTERROR
 		tmx.Status = STA_PLL
 		tmx.Offset = offsetNsec
-		tmx.Constant = int64(no.status.poll)
 		tmx.Maxerror = 0
 		tmx.Esterror = 0
 	} else {
 		Warn.Printf("settimeofday from %s", no.offset)
+		firstAdj = true
 		tv := syscall.NsecToTimeval(time.Now().Add(no.offset).UnixNano())
 		return syscall.Settimeofday(&tv)
 	}
@@ -54,8 +65,12 @@ func (s *Service) setOffset(no *ntpOffset) (err error) {
 	var rc int
 	rc, err = syscall.Adjtimex(tmx)
 	if rc != 0 {
-		return fmt.Errorf("rc=%d status=%s", rc, statusToString(tmx.Status))
+		Error.Printf("rc=%d status=%s", rc, statusToString(tmx.Status))
 	}
+	if !firstAdj && old.Nanoseconds() == 0 {
+		synced = true
+	}
+	firstAdj = false
 	return
 }
 

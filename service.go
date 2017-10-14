@@ -22,8 +22,10 @@ func NewService(cfg *Config) (s *Service, err error) {
 		return nil, err
 	}
 	s = &Service{
-		cfg:   cfg,
-		scale: time.Duration(1),
+		cfg:    cfg,
+		scale:  time.Duration(1),
+		status: &ntpStatus{},
+		freq:   &ntpFreq{},
 	}
 	s.conn, err = net.ListenUDP("udp", addr)
 	if err != nil {

@@ -12,7 +12,7 @@ var (
 )
 
 func init() {
-	Info = log.New(os.Stderr, "[INFO]", log.LstdFlags|log.LstdFlags)
-	Warn = log.New(os.Stderr, "[WARN]", log.LstdFlags|log.LstdFlags)
-	Error = log.New(os.Stderr, "[EROR]", log.LstdFlags|log.LstdFlags)
+	Info = log.New(os.Stderr, "[INFO] ", log.LstdFlags|log.LstdFlags)
+	Warn = log.New(os.Stderr, "[WARN] ", log.LstdFlags|log.LstdFlags)
+	Error = log.New(os.Stderr, "[EROR] ", log.LstdFlags|log.LstdFlags)
 }

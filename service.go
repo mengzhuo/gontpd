@@ -2,12 +2,12 @@ package gontpd
 
 import (
 	"net"
-	"os"
+	"sync"
 	"time"
 )
 
 const (
-	minStep   = 120 * time.Second
+	minStep   = 30 * time.Second
 	minPoll   = 5
 	maxPoll   = 8
 	maxAdjust = 128 * time.Millisecond
@@ -22,10 +22,11 @@ func NewService(cfg *Config) (s *Service, err error) {
 		return nil, err
 	}
 	s = &Service{
-		cfg:    cfg,
-		scale:  time.Duration(1),
-		status: &ntpStatus{},
-		freq:   &ntpFreq{},
+		cfg:      cfg,
+		scale:    time.Duration(1),
+		status:   &ntpStatus{},
+		freq:     &ntpFreq{},
+		updateAt: time.Now(),
 	}
 	s.conn, err = net.ListenUDP("udp", addr)
 	if err != nil {
@@ -58,6 +59,7 @@ type Service struct {
 	status   *ntpStatus
 	freq     *ntpFreq
 	scale    time.Duration
+	updateAt time.Time
 	filters  uint8
 }
 
@@ -162,20 +164,22 @@ func (s *Service) workerDo(i int) {
 	}
 }
 
-func (s *Service) Serve(ch chan os.Signal) {
+func (s *Service) Serve() {
 
 	if s.cfg.ExpoMetric != "" {
 		s.stats = newStatistic(s.cfg)
 	}
 
+	var wg sync.WaitGroup
 	for _, p := range s.peerList {
-		go s.run(p)
+		go s.run(p, &wg)
 	}
 
 	for i := 0; i < s.cfg.WorkerNum; i++ {
+		wg.Add(1)
 		go s.workerDo(i)
 	}
-	<-ch
+	wg.Wait()
 }
 
 func newTemplate() (t []byte) {

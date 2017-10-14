@@ -10,6 +10,24 @@ import (
 
 var firstAdj bool = true
 
+func resetClock() {
+
+	mode := uint32(ADJ_STATUS | ADJ_NANO | ADJ_OFFSET | ADJ_FREQUENCY | ADJ_MAXERROR | ADJ_ESTERROR | ADJ_TIMECONST)
+
+	tmx := &syscall.Timex{
+		Modes:  mode,
+		Status: STA_PLL,
+	}
+
+	rc, err := syscall.Adjtimex(tmx)
+	if debug {
+		log.Print("reset", rc, err)
+	}
+	if rc == -1 {
+		Warn.Print("reset failed", rc, err)
+	}
+}
+
 func gettimeCorrected() float64 {
 	return float64(time.Now().UnixNano())*1e9 + getOffset().Seconds()
 }
@@ -52,7 +70,8 @@ func (s *Service) setOffset(no *ntpOffset) (synced bool) {
 		Warn.Printf("settimeofday from %s", no.offset)
 		firstAdj = true
 		tv := syscall.NsecToTimeval(time.Now().Add(no.offset).UnixNano())
-		return syscall.Settimeofday(&tv)
+		Warn.Print(syscall.Settimeofday(&tv))
+		return false
 	}
 
 	switch no.status.leap {
@@ -62,8 +81,7 @@ func (s *Service) setOffset(no *ntpOffset) (synced bool) {
 		tmx.Status |= STA_DEL
 	}
 
-	var rc int
-	rc, err = syscall.Adjtimex(tmx)
+	rc, _ := syscall.Adjtimex(tmx)
 	if rc != 0 {
 		Error.Printf("rc=%d status=%s", rc, statusToString(tmx.Status))
 	}

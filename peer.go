@@ -20,6 +20,8 @@ const (
 	trustlevelPathetic   = 2
 	trustlevelAggressive = 8
 	trustlevelMax        = 10
+
+	maxSendError = 30
 )
 
 const (
@@ -109,17 +111,22 @@ func newPeer(addr string) *peer {
 	return p
 }
 
-func (s *Service) run(p *peer) {
+func (s *Service) run(p *peer, wg *sync.WaitGroup) {
+
+	defer wg.Done()
 
 	for {
 		resp, err := p.query()
 		if err == nil && resp != nil {
 			s.dispatch(p, resp)
 		}
+		if p.sendErrors > maxSendError {
+			Warn.Printf("peer:%s too many errors, quit", p.addr)
+			return
+		}
 		time.Sleep(p.next)
 	}
 
-	return
 }
 
 func (p *peer) query() (resp *ntp.Response, err error) {
@@ -129,12 +136,13 @@ func (p *peer) query() (resp *ntp.Response, err error) {
 	resp, err = ntp.Query(p.addr)
 	if err != nil {
 		Warn.Print(err)
-		p.state = stateNetworkTempfail
+		p.sendErrors += 1
 		p.setNext(intervalQueryPathetic)
 		return
 	}
+	p.sendErrors = 0
 	if debug {
-		log.Printf("%s -> offset:%v, delay: %v err:%s",
+		log.Printf("%s -> offset:%v, delay: %v err:%v",
 			p.addr, resp.ClockOffset, resp.RTT, err)
 	}
 	return
@@ -243,7 +251,6 @@ func (s *Service) clockFilter(p *peer) (err error) {
 	 * use that as the peer update
 	 * invalidate it and all older ones
 	 */
-	// TODO good won't go up
 	var best, good int
 
 	for i, r := range p.reply {
@@ -319,7 +326,7 @@ func (s *Service) privAdjFreq(offset time.Duration) {
 
 	if s.freq.samples%frequencySamples != 0 {
 		if debug {
-			log.Printf("sample %d %% %s !=0 ", s.freq.samples, frequencySamples)
+			log.Printf("sample %d %% %d !=0 ", s.freq.samples, frequencySamples)
 		}
 		return
 	}
@@ -348,6 +355,11 @@ func (s *Service) privAjdtime() (err error) {
 	if debug {
 		log.Print("privAdjtime")
 	}
+
+	if time.Since(s.updateAt) < minStep {
+		return fmt.Errorf("adjust time too quick")
+	}
+	s.updateAt = time.Now()
 
 	offsets := []*ntpOffset{}
 	for _, p := range s.peerList {
@@ -387,13 +399,24 @@ func (s *Service) privAjdtime() (err error) {
 	s.status.refId = offsets[i].status.sendRefId
 	s.setTemplate(offsets[i])
 	s.status.synced = s.setOffset(offsets[i])
+	go s.updatePeerOffset(offsetMedian)
+	return
+}
+
+func (s *Service) updatePeerOffset(o time.Duration) {
+
+	if debug {
+		log.Print("updatePeerOffset")
+	}
+
 	for _, p := range s.peerList {
+		p.Lock()
 		for j := 0; j < len(p.reply); j++ {
-			p.reply[j].offset -= offsetMedian
+			p.reply[j].offset -= o
 		}
 		p.update.good = false
+		p.Unlock()
 	}
-	return
 }
 
 func (s *Service) updateScale(offset time.Duration) {

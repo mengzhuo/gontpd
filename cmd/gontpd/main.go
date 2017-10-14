@@ -40,5 +40,6 @@ func main() {
 	}
 	ch := make(chan os.Signal)
 	signal.Notify(ch, os.Interrupt)
-	service.Serve(ch)
+	go service.Serve()
+	<-ch
 }

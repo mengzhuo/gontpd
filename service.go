@@ -102,15 +102,9 @@ func (s *Service) workerDo(i int) {
 		remoteAddr  *net.UDPAddr
 		err         error
 		receiveTime time.Time
-		limiter     *secondLimitter
 	)
 
 	p := make([]byte, 48)
-	if s.cfg.ReqRateSec > 0 {
-		Info.Printf("limiter %d", s.cfg.ReqRateSec)
-		limiter = newLimitter(s.cfg.ReqRateSec)
-		go limiter.run()
-	}
 
 	defer func(i int) {
 		if r := recover(); r != nil {

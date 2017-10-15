@@ -21,7 +21,7 @@ const (
 	trustlevelAggressive = 8
 	trustlevelMax        = 10
 
-	maxSendError = 30
+	maxSendError = 3
 )
 
 const (
@@ -91,7 +91,6 @@ type peer struct {
 	poll       time.Time
 	lastErrors int
 	sendErrors int
-	id         uint32
 	shift      uint8
 	trustLevel uint8
 	state      peerState
@@ -140,6 +139,7 @@ func (p *peer) query() (resp *ntp.Response, err error) {
 		p.setNext(intervalQueryPathetic)
 		return
 	}
+
 	p.sendErrors = 0
 	if debug {
 		log.Printf("%s -> offset:%v, delay: %v err:%v",
@@ -220,17 +220,7 @@ func (s *Service) dispatch(p *peer, resp *ntp.Response) {
 
 func (p *peer) makeSendRefId() (id uint32) {
 
-	addrs, err := net.LookupHost(p.addr)
-	if err != nil {
-		Warn.Print(err)
-		return
-	}
-
-	if len(addrs) == 0 {
-		return
-	}
-
-	ip := net.ParseIP(addrs[0])
+	ip := net.ParseIP(p.addr)
 
 	if ip[11] == 255 {
 		// ipv4
@@ -412,7 +402,7 @@ func (s *Service) privAjdtime() (err error) {
 func (s *Service) updatePeerOffset(o time.Duration) {
 
 	if debug {
-		log.Print("updatePeerOffset")
+		log.Printf("updatePeerOffset %s", o)
 	}
 
 	for _, p := range s.peerList {
@@ -420,6 +410,7 @@ func (s *Service) updatePeerOffset(o time.Duration) {
 		for j := 0; j < len(p.reply); j++ {
 			p.reply[j].offset -= o
 		}
+		p.update.offset -= o
 		p.update.good = false
 		p.Unlock()
 	}

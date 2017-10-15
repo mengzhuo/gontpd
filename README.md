@@ -1,3 +1,5 @@
+WIP: this project is not ready YET.
+
 # gontpd
 
 A sntp daemon written in Go

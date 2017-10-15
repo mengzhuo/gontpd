@@ -278,12 +278,14 @@ func (s *Service) clockFilter(p *peer) (err error) {
 
 	*p.update = *p.reply[best]
 
-	if s.privAjdtime() == nil {
+	if err := s.privAjdtime(); err == nil {
 		for i, r := range p.reply {
 			if !r.rcvd.After(p.reply[best].rcvd) {
 				p.reply[i].good = false
 			}
 		}
+	} else {
+		Warn.Print(err)
 	}
 
 	return
@@ -367,6 +369,10 @@ func (s *Service) privAjdtime() (err error) {
 			continue
 		}
 		offsets = append(offsets, p.update)
+	}
+
+	if len(offsets) < 1 {
+		return fmt.Errorf("not enough good peer")
 	}
 
 	sort.Sort(byOffset(offsets))

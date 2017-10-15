@@ -32,13 +32,20 @@ func NewService(cfg *Config) (s *Service, err error) {
 		}
 		s.conn, err = net.ListenUDP("udp", addr)
 		if err != nil {
-			return
+			return nil, err
 		}
 	}
 
-	for _, paddr := range cfg.ServerList {
-		p := newPeer(paddr)
-		s.peerList = append(s.peerList, p)
+	for _, host := range cfg.ServerList {
+		addrList, err := net.LookupHost(host)
+		if err != nil {
+			Warn.Printf("peer:%s err:%s", host, err)
+			continue
+		}
+		for _, paddr := range addrList {
+			p := newPeer(paddr)
+			s.peerList = append(s.peerList, p)
+		}
 	}
 	s.template = newTemplate()
 
@@ -173,14 +180,16 @@ func (s *Service) Serve() {
 		s.stats = newStatistic(s.cfg)
 	}
 
+	resetClock()
+
 	var wg sync.WaitGroup
 	for _, p := range s.peerList {
+		wg.Add(1)
 		go s.run(p, &wg)
 	}
 
 	if s.cfg.Listen != "" {
 		for i := 0; i < s.cfg.WorkerNum; i++ {
-			wg.Add(1)
 			go s.workerDo(i)
 		}
 	}

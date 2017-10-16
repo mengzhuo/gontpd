@@ -33,9 +33,7 @@ func gettimeCorrected() float64 {
 }
 
 func getOffset() (offset time.Duration) {
-	tmx := &syscall.Timex{
-		Status: staPLL,
-	}
+	tmx := &syscall.Timex{}
 	rc, err := syscall.Adjtimex(tmx)
 	if rc == -1 {
 		Error.Printf("get offset failed:%d, %s", rc, err)
@@ -58,11 +56,12 @@ func (s *Service) setOffset(no *ntpOffset) (synced bool) {
 
 	tmx := &syscall.Timex{}
 	offsetNsec := d.Nanoseconds()
-
+	if debug {
+		log.Printf("%s < %s : %v", absDuration(d), maxAdjust, absDuration(d) < maxAdjust)
+	}
 	if absDuration(d) < maxAdjust {
 		Info.Printf("set offset slew offset=%s", no.offset)
-		tmx.Modes = adjSTATUS | adjNANO | adjOFFSET | adjMAXERROR | adjESTERROR
-		tmx.Status = staPLL
+		tmx.Modes = adjNANO | adjOFFSET | adjMAXERROR | adjESTERROR
 		tmx.Offset = offsetNsec
 		tmx.Maxerror = 0
 		tmx.Esterror = 0
@@ -81,9 +80,13 @@ func (s *Service) setOffset(no *ntpOffset) (synced bool) {
 		tmx.Status |= staDEL
 	}
 
-	rc, _ := syscall.Adjtimex(tmx)
+	rc, err := syscall.Adjtimex(tmx)
 	if rc != 0 {
 		Error.Printf("rc=%d status=%s", rc, statusToString(tmx.Status))
+	}
+	if debug {
+		log.Printf("firstAdj=%v, old=%s", firstAdj, old)
+		log.Printf("rc=%v, err=%s", rc, err)
 	}
 	if !firstAdj && old.Nanoseconds() == 0 {
 		synced = true

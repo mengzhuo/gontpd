@@ -241,23 +241,21 @@ func (s *Service) clockFilter(p *peer) (err error) {
 	 * use that as the peer update
 	 * invalidate it and all older ones
 	 */
-	var best, good int
+	var (
+		best, good int
+	)
+	bestDelay := time.Minute
 
 	for i, r := range p.reply {
 		if r.good {
 			good++
-			best = i
-		}
-	}
-
-	for i := best; i < len(p.reply); i++ {
-		if p.reply[i].good {
-			good++
-			if p.reply[i].delay < p.reply[best].delay {
+			if r.delay < bestDelay {
 				best = i
+				bestDelay = r.delay
 			}
 		}
 	}
+
 	if debug {
 		log.Printf("%s clockfilter: best:%d, good:%d", p, best, good)
 	}
@@ -348,9 +346,6 @@ func (s *Service) privAjdtime() (err error) {
 		log.Print("privAdjtime")
 	}
 
-	if time.Since(s.updateAt) < minStep {
-		return fmt.Errorf("adjust time too quick")
-	}
 	s.updateAt = time.Now()
 
 	offsets := []*ntpOffset{}
@@ -394,25 +389,26 @@ func (s *Service) privAjdtime() (err error) {
 	s.updateScale(offsetMedian)
 	s.status.refId = offsets[i].status.sendRefId
 	s.setTemplate(offsets[i])
-	s.status.synced = s.setOffset(offsets[i])
-	go s.updatePeerOffset(offsetMedian)
+	s.setOffset(offsets[i])
+	s.updatePeerOffset(offsetMedian, offsets[i])
 	return
 }
 
-func (s *Service) updatePeerOffset(o time.Duration) {
-
-	if debug {
-		log.Printf("updatePeerOffset %s", o)
-	}
+func (s *Service) updatePeerOffset(o time.Duration, skip *ntpOffset) {
 
 	for _, p := range s.peerList {
-		p.Lock()
+		if skip == p.update {
+			continue
+		}
+
+		if debug {
+			log.Printf("update %s by %s", p.addr, o)
+		}
 		for j := 0; j < len(p.reply); j++ {
 			p.reply[j].offset -= o
 		}
 		p.update.offset -= o
 		p.update.good = false
-		p.Unlock()
 	}
 }
 

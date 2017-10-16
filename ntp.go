@@ -14,6 +14,14 @@ const (
 	initRefer = 0x494e4954 // ascii for INIT
 )
 
+type ntpFreq struct {
+	overallOffset time.Duration
+	x, y          float64
+	xx, xy        float64
+	samples       int
+	num           uint
+}
+
 func NewService(cfg *Config) (s *Service, err error) {
 	cfg.log()
 
@@ -50,14 +58,6 @@ func NewService(cfg *Config) (s *Service, err error) {
 	s.template = newTemplate()
 
 	return
-}
-
-type ntpFreq struct {
-	overallOffset time.Duration
-	x, y          float64
-	xx, xy        float64
-	samples       int
-	num           uint
 }
 
 type Service struct {

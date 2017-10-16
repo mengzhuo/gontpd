@@ -7,11 +7,11 @@ import (
 
 func newTemplate() (t []byte) {
 	t = make([]byte, 48)
-	SetLi(t, 0)
+	SetLi(t, NoLeap)
 	SetVersion(t, 4)
 	SetMode(t, ModeServer)
 	SetUint32(t, ReferIDPos, initRefer)
-	SetInt8(t, Poll, 4)
+	SetInt8(t, Poll, minPoll)
 	SetUint64(t, ReferenceTimeStamp, toNtpTime(time.Now()))
 	return
 }

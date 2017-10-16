@@ -52,6 +52,9 @@ func (s *Service) setOffset(no *ntpOffset) (synced bool) {
 
 	d := no.offset
 	old := getOffset()
+	if debug {
+		log.Print("old", old)
+	}
 	d += old
 
 	tmx := &syscall.Timex{}

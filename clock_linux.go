@@ -12,11 +12,11 @@ var firstAdj bool = true
 
 func resetClock() {
 
-	mode := uint32(ADJ_STATUS | ADJ_NANO | ADJ_OFFSET | ADJ_FREQUENCY | ADJ_MAXERROR | ADJ_ESTERROR | ADJ_TIMECONST)
+	mode := uint32(adjSTATUS | adjNANO | adjOFFSET | adjFREQUENCY | adjMAXERROR | adjESTERROR | adjTIMECONST)
 
 	tmx := &syscall.Timex{
 		Modes:  mode,
-		Status: STA_PLL,
+		Status: staPLL,
 	}
 
 	rc, err := syscall.Adjtimex(tmx)
@@ -34,7 +34,7 @@ func gettimeCorrected() float64 {
 
 func getOffset() (offset time.Duration) {
 	tmx := &syscall.Timex{
-		Status: STA_PLL,
+		Status: staPLL,
 	}
 	rc, err := syscall.Adjtimex(tmx)
 	if rc == -1 {
@@ -61,8 +61,8 @@ func (s *Service) setOffset(no *ntpOffset) (synced bool) {
 
 	if absDuration(d) < maxAdjust {
 		Info.Printf("set offset slew offset=%s", no.offset)
-		tmx.Modes = ADJ_STATUS | ADJ_NANO | ADJ_OFFSET | ADJ_MAXERROR | ADJ_ESTERROR
-		tmx.Status = STA_PLL
+		tmx.Modes = adjSTATUS | adjNANO | adjOFFSET | adjMAXERROR | adjESTERROR
+		tmx.Status = staPLL
 		tmx.Offset = offsetNsec
 		tmx.Maxerror = 0
 		tmx.Esterror = 0
@@ -76,9 +76,9 @@ func (s *Service) setOffset(no *ntpOffset) (synced bool) {
 
 	switch no.status.leap {
 	case LeapIns:
-		tmx.Status |= STA_INS
+		tmx.Status |= staINS
 	case LeapDel:
-		tmx.Status |= STA_DEL
+		tmx.Status |= staDEL
 	}
 
 	rc, _ := syscall.Adjtimex(tmx)
@@ -97,109 +97,109 @@ func (s *Service) setOffset(no *ntpOffset) (synced bool) {
  */
 
 const (
-	ADJ_OFFSET            = 0x0001 /* time offset */
-	ADJ_FREQUENCY         = 0x0002 /* frequency offset */
-	ADJ_MAXERROR          = 0x0004 /* maximum time error */
-	ADJ_ESTERROR          = 0x0008 /* estimated time error */
-	ADJ_STATUS            = 0x0010 /* clock status */
-	ADJ_TIMECONST         = 0x0020 /* pll time constant */
-	ADJ_TAI               = 0x0080 /* set TAI offset */
-	ADJ_SETOFFSET         = 0x0100 /* add 'time' to current time */
-	ADJ_MICRO             = 0x1000 /* select microsecond resolution */
-	ADJ_NANO              = 0x2000 /* select nanosecond resolution */
-	ADJ_TICK              = 0x4000 /* tick value */
-	ADJ_OFFSET_SINGLESHOT = 0x8001 /* old-fashioned adjtime */
-	ADJ_OFFSET_SS_READ    = 0xa001 /* read-only adjtime */
+	adjOFFSET            = 0x0001 /* time offset */
+	adjFREQUENCY         = 0x0002 /* frequency offset */
+	adjMAXERROR          = 0x0004 /* maximum time error */
+	adjESTERROR          = 0x0008 /* estimated time error */
+	adjSTATUS            = 0x0010 /* clock status */
+	adjTIMECONST         = 0x0020 /* pll time constant */
+	adjTAI               = 0x0080 /* set TAI offset */
+	adjSETOFFSET         = 0x0100 /* add 'time' to current time */
+	adjMICRO             = 0x1000 /* select microsecond resolution */
+	adjNANO              = 0x2000 /* select nanosecond resolution */
+	adjTICK              = 0x4000 /* tick value */
+	adjOFFSET_SINGLESHOT = 0x8001 /* old-fashioned adjtime */
+	adjOFFSET_SS_READ    = 0xa001 /* read-only adjtime */
 
-	MOD_OFFSET    = ADJ_OFFSET
-	MOD_FREQUENCY = ADJ_FREQUENCY
-	MOD_MAXERROR  = ADJ_MAXERROR
-	MOD_ESTERROR  = ADJ_ESTERROR
-	MOD_STATUS    = ADJ_STATUS
-	MOD_TIMECONST = ADJ_TIMECONST
-	MOD_TAI       = ADJ_TAI
-	MOD_MICRO     = ADJ_MICRO
-	MOD_NANO      = ADJ_NANO
+	modOFFSET    = adjOFFSET
+	modFREQUENCY = adjFREQUENCY
+	modMAXERROR  = adjMAXERROR
+	modESTERROR  = adjESTERROR
+	modSTATUS    = adjSTATUS
+	modTIMECONST = adjTIMECONST
+	modTAI       = adjTAI
+	modMICRO     = adjMICRO
+	modNANO      = adjNANO
 
-	STA_PLL       = 0x0001 /* enable PLL updates (rw) */
-	STA_PPSFREQ   = 0x0002 /* enable PPS freq discipline (rw) */
-	STA_PPSTIME   = 0x0004 /* enable PPS time discipline (rw) */
-	STA_FLL       = 0x0008 /* select frequency-lock mode (rw) */
-	STA_INS       = 0x0010 /* insert leap (rw) */
-	STA_DEL       = 0x0020 /* delete leap (rw) */
-	STA_UNSYNC    = 0x0040 /* clock unsynchronized (rw) */
-	STA_FREQHOLD  = 0x0080 /* hold frequency (rw) */
-	STA_PPSSIGNAL = 0x0100 /* PPS signal present (ro) */
-	STA_PPSJITTER = 0x0200 /* PPS signal jitter exceeded (ro) */
-	STA_PPSWANDER = 0x0400 /* PPS signal wander exceeded (ro) */
-	STA_PPSERROR  = 0x0800 /* PPS signal calibration error (ro) */
-	STA_CLOCKERR  = 0x1000 /* clock hardware fault (ro) */
-	STA_NANO      = 0x2000 /* resolution (0 = us, 1 = ns) (ro) */
-	STA_MODE      = 0x4000 /* mode (0 = PLL, 1 = FLL) (ro) */
-	STA_CLK       = 0x8000 /* clock source (0 = A, 1 = B) (ro) */
+	staPLL       = 0x0001 /* enable PLL updates (rw) */
+	staPPSFREQ   = 0x0002 /* enable PPS freq discipline (rw) */
+	staPPSTIME   = 0x0004 /* enable PPS time discipline (rw) */
+	staFLL       = 0x0008 /* select frequency-lock mode (rw) */
+	staINS       = 0x0010 /* insert leap (rw) */
+	staDEL       = 0x0020 /* delete leap (rw) */
+	staUNSYNC    = 0x0040 /* clock unsynchronized (rw) */
+	staFREQHOLD  = 0x0080 /* hold frequency (rw) */
+	staPPSSIGNAL = 0x0100 /* PPS signal present (ro) */
+	staPPSJITTER = 0x0200 /* PPS signal jitter exceeded (ro) */
+	staPPSWANDER = 0x0400 /* PPS signal wander exceeded (ro) */
+	staPPSERROR  = 0x0800 /* PPS signal calibration error (ro) */
+	staCLOCKERR  = 0x1000 /* clock hardware fault (ro) */
+	staNANO      = 0x2000 /* resolution (0 = us, 1 = ns) (ro) */
+	staMODE      = 0x4000 /* mode (0 = PLL, 1 = FLL) (ro) */
+	staCLK       = 0x8000 /* clock source (0 = A, 1 = B) (ro) */
 
-	TIME_INS   = 1          /* insert leap second */
-	TIME_DEL   = 2          /* delete leap second */
-	TIME_OOP   = 3          /* leap second in progress */
-	TIME_WAIT  = 4          /* leap second has occurred */
-	TIME_ERROR = 5          /* clock not synchronized */
-	TIME_BAD   = TIME_ERROR /* bw compat */
+	timeINS   = 1         /* insert leap second */
+	timeDEL   = 2         /* delete leap second */
+	timeOOP   = 3         /* leap second in progress */
+	timeWAIT  = 4         /* leap second has occurred */
+	timeERROR = 5         /* clock not synchronized */
+	timeBAD   = timeERROR /* bw compat */
 
-	STA_RONLY = (STA_PPSSIGNAL | STA_PPSJITTER | STA_PPSWANDER |
-		STA_PPSERROR | STA_CLOCKERR | STA_NANO | STA_MODE | STA_CLK)
+	staRONLY = (staPPSSIGNAL | staPPSJITTER | staPPSWANDER |
+		staPPSERROR | staCLOCKERR | staNANO | staMODE | staCLK)
 )
 
 func statusToString(s int32) (status string) {
 
 	buf := []string{}
 
-	if STA_PLL&s != 0 {
-		buf = append(buf, "STA_PLL")
+	if staPLL&s != 0 {
+		buf = append(buf, "staPLL")
 	}
-	if STA_PPSFREQ&s != 0 {
-		buf = append(buf, "STA_PPSFREQ")
+	if staPPSFREQ&s != 0 {
+		buf = append(buf, "staPPSFREQ")
 	}
-	if STA_PPSTIME&s != 0 {
-		buf = append(buf, "STA_PPSTIME")
+	if staPPSTIME&s != 0 {
+		buf = append(buf, "staPPSTIME")
 	}
-	if STA_FLL&s != 0 {
-		buf = append(buf, "STA_FLL")
+	if staFLL&s != 0 {
+		buf = append(buf, "staFLL")
 	}
-	if STA_INS&s != 0 {
-		buf = append(buf, "STA_INS")
+	if staINS&s != 0 {
+		buf = append(buf, "staINS")
 	}
-	if STA_DEL&s != 0 {
-		buf = append(buf, "STA_DEL")
+	if staDEL&s != 0 {
+		buf = append(buf, "staDEL")
 	}
-	if STA_UNSYNC&s != 0 {
-		buf = append(buf, "STA_UNSYNC")
+	if staUNSYNC&s != 0 {
+		buf = append(buf, "staUNSYNC")
 	}
-	if STA_FREQHOLD&s != 0 {
-		buf = append(buf, "STA_FREQHOLD")
+	if staFREQHOLD&s != 0 {
+		buf = append(buf, "staFREQHOLD")
 	}
-	if STA_PPSSIGNAL&s != 0 {
-		buf = append(buf, "STA_PPSSIGNAL")
+	if staPPSSIGNAL&s != 0 {
+		buf = append(buf, "staPPSSIGNAL")
 	}
-	if STA_PPSJITTER&s != 0 {
-		buf = append(buf, "STA_PPSJITTER")
+	if staPPSJITTER&s != 0 {
+		buf = append(buf, "staPPSJITTER")
 	}
-	if STA_PPSWANDER&s != 0 {
-		buf = append(buf, "STA_PPSWANDER")
+	if staPPSWANDER&s != 0 {
+		buf = append(buf, "staPPSWANDER")
 	}
-	if STA_PPSERROR&s != 0 {
-		buf = append(buf, "STA_PPSERROR")
+	if staPPSERROR&s != 0 {
+		buf = append(buf, "staPPSERROR")
 	}
-	if STA_CLOCKERR&s != 0 {
-		buf = append(buf, "STA_CLOCKERR")
+	if staCLOCKERR&s != 0 {
+		buf = append(buf, "staCLOCKERR")
 	}
-	if STA_NANO&s != 0 {
-		buf = append(buf, "STA_NANO")
+	if staNANO&s != 0 {
+		buf = append(buf, "staNANO")
 	}
-	if STA_MODE&s != 0 {
-		buf = append(buf, "STA_MODE")
+	if staMODE&s != 0 {
+		buf = append(buf, "staMODE")
 	}
-	if STA_CLK&s != 0 {
-		buf = append(buf, "STA_CLK")
+	if staCLK&s != 0 {
+		buf = append(buf, "staCLK")
 	}
 	return strings.Join(buf, ", ")
 }

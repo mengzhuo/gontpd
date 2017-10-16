@@ -78,10 +78,6 @@ type ntpOffset struct {
 	good bool
 }
 
-var (
-	epoch = time.Unix(0, 0)
-)
-
 type peer struct {
 	addr       string
 	reply      [offsetSize]*ntpOffset
@@ -266,13 +262,7 @@ func (s *Service) clockFilter(p *peer) (err error) {
 
 	*p.update = *p.reply[best]
 
-	if err := s.privAjdtime(); err == nil {
-		for i, r := range p.reply {
-			if !r.rcvd.After(p.reply[best].rcvd) {
-				p.reply[i].good = false
-			}
-		}
-	} else {
+	if err := s.privAjdtime(); err != nil {
 		Warn.Print(err)
 	}
 
@@ -330,6 +320,10 @@ func (s *Service) privAdjFreq(offset time.Duration) {
 		freq = -maxFrequencyAdjust
 	}
 
+	s.ctrl <- &ctrlMsg{
+		id:   msgAdjFreq,
+		freq: freq}
+
 	s.filters |= filterAdjFreq
 	s.freq.xy = 0
 	s.freq.x = 0
@@ -345,8 +339,6 @@ func (s *Service) privAjdtime() (err error) {
 	if debug {
 		log.Print("privAdjtime")
 	}
-
-	s.updateAt = time.Now()
 
 	offsets := []*ntpOffset{}
 	for _, p := range s.peerList {
@@ -378,6 +370,11 @@ func (s *Service) privAjdtime() (err error) {
 	s.status.stratum = offsets[i].status.stratum
 	s.status.leap = offsets[i].status.leap
 
+	msg := &ctrlMsg{id: msgAdjTime, delta: &ntpOffset{}}
+	// copy
+	*msg.delta = *offsets[i]
+	s.ctrl <- msg
+
 	s.privAdjFreq(offsetMedian)
 
 	s.status.refTime = time.Now()
@@ -389,18 +386,13 @@ func (s *Service) privAjdtime() (err error) {
 	s.updateScale(offsetMedian)
 	s.status.refId = offsets[i].status.sendRefId
 	s.setTemplate(offsets[i])
-	s.setOffset(offsets[i])
-	s.updatePeerOffset(offsetMedian, offsets[i])
+	s.updatePeerOffset(offsetMedian)
 	return
 }
 
-func (s *Service) updatePeerOffset(o time.Duration, skip *ntpOffset) {
+func (s *Service) updatePeerOffset(o time.Duration) {
 
 	for _, p := range s.peerList {
-		if skip == p.update {
-			continue
-		}
-
 		if debug {
 			log.Printf("update %s by %s", p.addr, o)
 		}

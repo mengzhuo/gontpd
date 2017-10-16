@@ -1,6 +1,7 @@
 package gontpd
 
 import (
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -12,6 +13,10 @@ const (
 	maxPoll   = 8
 	maxAdjust = 128 * time.Millisecond
 	initRefer = 0x494e4954 // ascii for INIT
+)
+
+var (
+	epoch = time.Unix(0, 0)
 )
 
 type ntpFreq struct {
@@ -26,22 +31,11 @@ func NewService(cfg *Config) (s *Service, err error) {
 	cfg.log()
 
 	s = &Service{
-		cfg:      cfg,
-		scale:    time.Duration(1),
-		status:   &ntpStatus{},
-		freq:     &ntpFreq{},
-		updateAt: time.Now(),
-	}
-
-	if cfg.Listen != "" {
-		addr, err := net.ResolveUDPAddr("udp", cfg.Listen)
-		if err != nil {
-			return nil, err
-		}
-		s.conn, err = net.ListenUDP("udp", addr)
-		if err != nil {
-			return nil, err
-		}
+		cfg:    cfg,
+		scale:  time.Duration(1),
+		status: &ntpStatus{},
+		freq:   &ntpFreq{},
+		ctrl:   make(chan *ctrlMsg),
 	}
 
 	for _, host := range cfg.ServerList {
@@ -55,6 +49,18 @@ func NewService(cfg *Config) (s *Service, err error) {
 			s.peerList = append(s.peerList, p)
 		}
 	}
+
+	if cfg.Listen != "" {
+		addr, err := net.ResolveUDPAddr("udp", cfg.Listen)
+		if err != nil {
+			return nil, err
+		}
+		s.conn, err = net.ListenUDP("udp", addr)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	s.template = newTemplate()
 
 	return
@@ -69,7 +75,7 @@ type Service struct {
 	status   *ntpStatus
 	freq     *ntpFreq
 	scale    time.Duration
-	updateAt time.Time
+	ctrl     chan *ctrlMsg
 	filters  uint8
 }
 
@@ -78,9 +84,7 @@ func (s *Service) Serve() {
 	if s.cfg.ExpoMetric != "" {
 		s.stats = newStatistic(s.cfg)
 	}
-
-	resetClock()
-
+	go s.listenCtrlMsg()
 	var wg sync.WaitGroup
 	for _, p := range s.peerList {
 		wg.Add(1)
@@ -93,4 +97,34 @@ func (s *Service) Serve() {
 		}
 	}
 	wg.Wait()
+}
+
+func (s *Service) listenCtrlMsg() {
+
+	resetClock()
+
+	for {
+		msg := <-s.ctrl
+		if debug {
+			log.Printf("listenCtrlMsg %v", msg)
+		}
+		switch msg.id {
+		case msgAdjTime:
+			if msg.delta == nil {
+				Info.Print("clock now unsynced")
+				s.status.synced = false
+				continue
+			} else {
+				Info.Print("clock now synced")
+				s.status.synced = true
+			}
+			s.ntpdAdjtime(msg.delta)
+		case msgAdjFreq:
+			s.ntpdAdjFreq(msg.freq)
+		case msgSetTime:
+			s.ntpdSettime(msg.delta)
+		default:
+			Warn.Printf("unknown msg :%d", msg.id)
+		}
+	}
 }

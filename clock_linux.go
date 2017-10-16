@@ -44,11 +44,33 @@ func getOffset() (offset time.Duration) {
 	return
 }
 
-func (s *Service) setOffset(no *ntpOffset) (synced bool) {
+func (s *Service) ntpdAdjFreq(dSec float64) {
 
-	if debug {
-		log.Printf("set offset %v", no.offset)
+	var cur *syscall.Timex
+	rc, err := syscall.Adjtimex(cur)
+	if rc == -1 {
+		Error.Printf("get curfreq failed, rc=%d, err=%v", rc, err)
+		return
 	}
+	curFreq := cur.Freq
+	curFreq += int64(dSec*1e9) * (1 << 32)
+
+	cur.Freq = curFreq
+	cur.Status = adjFREQUENCY
+	rc, err = syscall.Adjtimex(cur)
+	if rc == -1 {
+		Error.Printf("set freq failed, rc=%d, err=%v", rc, err)
+	}
+}
+
+func (s *Service) ntpdSettime(no *ntpOffset) {
+	firstAdj = true
+	Warn.Printf("settimeofday from %s", no.offset)
+	tv := syscall.NsecToTimeval(time.Now().Add(-no.offset).UnixNano())
+	Warn.Print(syscall.Settimeofday(&tv))
+}
+
+func (s *Service) ntpdAdjtime(no *ntpOffset) (synced bool) {
 
 	d := no.offset
 	old := getOffset()
@@ -69,10 +91,8 @@ func (s *Service) setOffset(no *ntpOffset) (synced bool) {
 		tmx.Maxerror = 0
 		tmx.Esterror = 0
 	} else {
-		Warn.Printf("settimeofday from %s", no.offset)
-		firstAdj = true
-		tv := syscall.NsecToTimeval(time.Now().Add(no.offset).UnixNano())
-		Warn.Print(syscall.Settimeofday(&tv))
+		Warn.Print("adjtime failed, offset too big")
+		s.ntpdSettime(no)
 		return false
 	}
 
@@ -87,10 +107,12 @@ func (s *Service) setOffset(no *ntpOffset) (synced bool) {
 	if rc != 0 {
 		Error.Printf("rc=%d status=%s", rc, statusToString(tmx.Status))
 	}
+
 	if debug {
 		log.Printf("firstAdj=%v, old=%s", firstAdj, old)
 		log.Printf("rc=%v, err=%s", rc, err)
 	}
+
 	if !firstAdj && old.Nanoseconds() == 0 {
 		synced = true
 	}

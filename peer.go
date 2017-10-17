@@ -82,10 +82,12 @@ type peer struct {
 }
 
 func newPeer(addr string) *peer {
+
+	// addr must be ip
+
 	p := &peer{
 		addr:       addr,
 		trustLevel: trustlevelPathetic,
-		state:      stateNone,
 		update:     &ntpOffset{},
 	}
 	for i := 0; i < offsetSize; i++ {
@@ -408,7 +410,7 @@ func (s *Service) updateScale(offset time.Duration) {
 }
 
 func (p *peer) String() string {
-	return fmt.Sprintf("%s [%d]", p.addr, p.state)
+	return fmt.Sprintf("%s", p.addr)
 }
 
 func (p *peer) setNext(d time.Duration) {

@@ -33,7 +33,9 @@ func gettimeCorrected() float64 {
 }
 
 func getOffset() (offset time.Duration) {
-	tmx := &syscall.Timex{}
+	tmx := &syscall.Timex{
+		Status: staNANO,
+	}
 	rc, err := syscall.Adjtimex(tmx)
 	if rc == -1 {
 		Error.Printf("get offset failed:%d, %s", rc, err)
@@ -75,7 +77,7 @@ func (s *Service) ntpdAdjtime(no *ntpOffset) (synced bool) {
 	d := no.offset
 	old := getOffset()
 	if debug {
-		log.Print("old", old)
+		log.Print("old", old, "d=", no.offset)
 	}
 	d += old
 

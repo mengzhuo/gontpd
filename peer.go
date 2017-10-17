@@ -44,17 +44,6 @@ const (
 	filterAdjFreq              = 0x01
 )
 
-const (
-	stateNone peerState = iota
-	stateNetworkTempfail
-	stateQuerySent
-	stateReplyReceived
-	stateTimeout
-	stateInvalid
-)
-
-type peerState uint8
-
 type ntpStatus struct {
 	rootDelay      time.Duration
 	rootDispersion time.Duration
@@ -89,7 +78,6 @@ type peer struct {
 	sendErrors int
 	shift      uint8
 	trustLevel uint8
-	state      peerState
 	sync.Mutex
 }
 

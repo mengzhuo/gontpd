@@ -1,130 +1,124 @@
 package gontpd
 
 import (
-	"log"
-	"net"
-	"sync"
+	"encoding/binary"
 	"time"
-)
-
-const (
-	minStep   = 30 * time.Second
-	minPoll   = 5
-	maxPoll   = 8
-	maxAdjust = 128 * time.Millisecond
-	initRefer = 0x494e4954 // ascii for INIT
 )
 
 var (
 	epoch = time.Unix(0, 0)
 )
 
-type ntpFreq struct {
-	overallOffset time.Duration
-	x, y          float64
-	xx, xy        float64
-	samples       int
-	num           uint
+const (
+	nanoPerSec = 1e9
+	initRefer  = 0x494e4954
+	minPoll    = 5
+)
+
+const (
+	ModeReserved uint8 = iota
+	ModeSymmetricActive
+	ModeSymmetricPassive
+	ModeClient
+	ModeServer
+	ModeBroadcast
+	ModeControlMessage
+	ModeReservedPrivate
+)
+
+const (
+	LiVnModePos = iota
+	StratumPos
+	PollPos
+	ClockPrecisionPos
+)
+
+const (
+	RootDelayPos = iota*4 + 4
+	RootDispersionPos
+	ReferIDPos
+)
+
+const (
+	ReferenceTimeStamp = iota*8 + 16
+	OriginTimeStamp
+	ReceiveTimeStamp
+	TransmitTimeStamp
+)
+
+var (
+	ntpEpoch = time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC)
+)
+
+func toNtpTime(t time.Time) uint64 {
+	nsec := uint64(t.Sub(ntpEpoch))
+	sec := nsec / nanoPerSec
+	frac := (nsec - sec*nanoPerSec) << 32 / nanoPerSec
+	return uint64(sec<<32 | frac)
 }
 
-func NewService(cfg *Config) (s *Service, err error) {
-	cfg.log()
+func SetLi(m []byte, li uint8) {
+	m[0] = (m[0] & 0x3f) | li<<6
+}
 
-	s = &Service{
-		cfg:    cfg,
-		scale:  time.Duration(1),
-		status: &ntpStatus{},
-		freq:   &ntpFreq{},
-		ctrl:   make(chan *ctrlMsg),
-	}
+func SetMode(m []byte, mode uint8) {
+	m[0] = (m[0] & 0xf8) | mode
+}
 
-	for _, host := range cfg.ServerList {
-		addrList, err := net.LookupHost(host)
-		if err != nil {
-			Warn.Printf("peer:%s err:%s", host, err)
-			continue
-		}
-		for _, paddr := range addrList {
-			p := newPeer(paddr)
-			s.peerList = append(s.peerList, p)
-		}
-	}
+func GetMode(m []byte) uint8 {
+	return m[0] &^ 0xf8
+}
 
-	if cfg.Listen != "" {
-		addr, err := net.ResolveUDPAddr("udp", cfg.Listen)
-		if err != nil {
-			return nil, err
-		}
-		s.conn, err = net.ListenUDP("udp", addr)
-		if err != nil {
-			return nil, err
-		}
-	}
+func SetVersion(m []byte, v uint8) {
+	m[0] = (m[0] & 0xc7) | v<<3
+}
 
-	s.template = newTemplate()
+func SetUint64(m []byte, index int, value uint64) {
+	binary.BigEndian.PutUint64(m[index:], value)
+}
 
+func SetUint8(m []byte, index int, value uint8) {
+	m[index] = value
+}
+
+func SetInt8(m []byte, index int, value int8) {
+	// bigEndian
+	m[index] = byte(value)
+}
+
+func SetUint32(m []byte, index int, value uint32) {
+	binary.BigEndian.PutUint32(m[index:], value)
+}
+
+func toNtpShortTime(t time.Duration) uint32 {
+	sec := t / nanoPerSec
+	frac := (t - sec*nanoPerSec) << 16 / nanoPerSec
+	return uint32(sec<<16 | frac)
+}
+
+func newTemplate() (t []byte) {
+	t = make([]byte, 48)
+	SetLi(t, NoLeap)
+	SetVersion(t, 4)
+	SetMode(t, ModeServer)
+	SetUint32(t, ReferIDPos, initRefer)
+	SetInt8(t, PollPos, minPoll)
+	SetUint64(t, ReferenceTimeStamp, toNtpTime(time.Now()))
 	return
 }
 
-type Service struct {
-	peerList []*peer
-	conn     *net.UDPConn
-	stats    *statistic
-	cfg      *Config
-	template []byte
-	status   *ntpStatus
-	freq     *ntpFreq
-	scale    time.Duration
-	ctrl     chan *ctrlMsg
-	filters  uint8
-}
+func (d *NTPd) setTemplate(op *offsetPeer) {
 
-func (s *Service) Serve() {
+	SetLi(d.template, uint8(op.resp.Leap))
+	SetMode(d.template, ModeServer)
 
-	if s.cfg.ExpoMetric != "" {
-		s.stats = newStatistic(s.cfg)
-	}
-	go s.listenCtrlMsg()
-	var wg sync.WaitGroup
-	for _, p := range s.peerList {
-		wg.Add(1)
-		go s.run(p, &wg)
-	}
+	SetUint8(d.template, StratumPos, op.resp.Stratum+1)
+	SetInt8(d.template, ClockPrecisionPos, systemPrecision())
+	SetUint32(d.template, RootDelayPos, toNtpShortTime(op.resp.RootDelay))
 
-	if s.cfg.Listen != "" {
-		for i := 0; i < s.cfg.WorkerNum; i++ {
-			go s.workerDo(i)
-		}
-	}
-	wg.Wait()
-}
+	SetUint32(d.template, RootDispersionPos, toNtpShortTime(op.resp.RootDispersion))
+	SetUint64(d.template, ReferenceTimeStamp, toNtpTime(op.resp.ReferenceTime))
+	SetUint32(d.template, ReferIDPos, op.peer.refId)
 
-func (s *Service) listenCtrlMsg() {
-
-	resetClock()
-
-	for {
-		msg := <-s.ctrl
-		if debug {
-			log.Printf("listenCtrlMsg %v", msg)
-		}
-		switch msg.id {
-		case msgAdjTime:
-			if msg.delta == nil {
-				Info.Print("clock now unsynced")
-				s.status.synced = false
-				continue
-			} else {
-				Info.Print("clock now synced")
-				s.status.synced = true
-			}
-			s.ntpdAdjtime(msg.delta)
-		case msgAdjFreq:
-			s.ntpdAdjFreq(msg.freq)
-		case msgSetTime:
-			s.ntpdSettime(msg.delta)
-		default:
-			Warn.Printf("unknown msg :%d", msg.id)
-		}
-	}
+	SetInt8(d.template, PollPos, int8(op.peer.trustLevel))
 }

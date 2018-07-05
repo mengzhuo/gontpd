@@ -4,42 +4,31 @@ import (
 	"flag"
 	"io/ioutil"
 	"log"
-	"os"
-	"os/signal"
 
 	"github.com/mengzhuo/gontpd"
+	yaml "gopkg.in/yaml.v2"
 )
 
 var (
-	fp    = flag.String("c", "config.example.yml", "Go NTP config file")
-	level = flag.String("l", "info", "Log level, debug/info/warn/error")
+	fp = flag.String("c", "gontpd.yaml", "yaml config file")
+	ff = flag.Int("f", 16, "log flag")
 )
 
 func main() {
 	flag.Parse()
 
-	nilLogger := log.New(ioutil.Discard, "", log.Ldate)
+	log.SetFlags(*ff)
 
-	switch *level {
-	case "info":
-	case "warn":
-		gontpd.Info = nilLogger
-	case "error":
-		gontpd.Info = nilLogger
-		gontpd.Warn = nilLogger
-	}
-	gontpd.Info.Print("starting gontpd")
-
-	cfg, err := gontpd.NewConfigFromFile(*fp)
+	p, err := ioutil.ReadFile(*fp)
 	if err != nil {
 		log.Fatal(err)
 	}
-	service, err := gontpd.NewService(cfg)
+	cfg := &gontpd.Config{}
+	err = yaml.Unmarshal(p, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
-	ch := make(chan os.Signal)
-	signal.Notify(ch, os.Interrupt)
-	go service.Serve()
-	<-ch
+	log.Printf("%#v", cfg)
+	d := gontpd.New(cfg)
+	log.Fatal(d.Run())
 }

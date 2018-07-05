@@ -1,0 +1,7 @@
+forceupdate: true
+listen: ':123'
+workernum: 7
+peerlist:
+    - time1.aliyun.com
+    - time2.aliyun.com
+    - time3.aliyun.com

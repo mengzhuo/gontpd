@@ -1,9 +1,0 @@
-listen: :123
-metric: 
-geodb: 
-worker: 0
-rate: 0
-server:
-    - 1.gontpd.pool.ntp.org
-    - 2.gontpd.pool.ntp.org
-    - 3.gontpd.pool.ntp.org

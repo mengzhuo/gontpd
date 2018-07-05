@@ -1,6 +1,0 @@
-# /etc/default/gontpd
-
-# Append '-s' to set the system time when starting in case the offset
-# between the local clock and the servers is more than 180 seconds.
-
-DAEMON_OPTS="-c /etc/gontpd/gontpd.conf.yml"

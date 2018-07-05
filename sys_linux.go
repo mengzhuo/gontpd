@@ -1,6 +1,7 @@
 package gontpd
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"strings"
@@ -8,77 +9,37 @@ import (
 	"time"
 )
 
-var firstAdj bool = true
+const maxAdjust = 128 * time.Millisecond
+const (
+	NoLeap uint8 = iota
+	LeapIns
+	LeapDel
+	NotSync
+)
 
-func resetClock() {
-
-	mode := uint32(adjSTATUS | adjNANO | adjOFFSET | adjFREQUENCY | adjMAXERROR | adjESTERROR | adjTIMECONST)
-
-	tmx := &syscall.Timex{
-		Modes:  mode,
-		Status: staPLL,
+func absDuration(d time.Duration) time.Duration {
+	if d < 0 {
+		return -d
 	}
-
-	rc, err := syscall.Adjtimex(tmx)
-	if debug {
-		log.Print("reset", rc, err)
-	}
-	if rc == -1 {
-		Warn.Print("reset failed", rc, err)
-	}
+	return d
 }
 
-func gettimeCorrected() float64 {
-	return float64(time.Now().UnixNano())*1e9 + getOffset().Seconds()
+func setOffset(d time.Duration) (err error) {
+	tv := syscall.NsecToTimeval(time.Now().Add(d).UnixNano())
+	return syscall.Settimeofday(&tv)
 }
 
-func getOffset() (offset time.Duration) {
-	tmx := &syscall.Timex{
-		Status: staNANO,
-	}
-	rc, err := syscall.Adjtimex(tmx)
-	if rc == -1 {
-		Error.Printf("get offset failed:%d, %s", rc, err)
+func syncClock(d time.Duration, leap uint8, force bool) (err error) {
+
+	old, err := getOffset()
+	if err != nil {
 		return
 	}
-	// 1us = 1000 ns
-	offset = time.Duration(tmx.Offset * 1000)
-	return
-}
 
-func (s *Service) ntpdAdjFreq(dSec float64) {
-
-	var cur *syscall.Timex
-	rc, err := syscall.Adjtimex(cur)
-	if rc == -1 {
-		Error.Printf("get curfreq failed, rc=%d, err=%v", rc, err)
-		return
-	}
-	curFreq := cur.Freq
-	curFreq += int64(dSec*1e9) * (1 << 32)
-
-	cur.Freq = curFreq
-	cur.Status = adjFREQUENCY
-	rc, err = syscall.Adjtimex(cur)
-	if rc == -1 {
-		Error.Printf("set freq failed, rc=%d, err=%v", rc, err)
-	}
-}
-
-func (s *Service) ntpdSettime(no *ntpOffset) {
-	firstAdj = true
-	Warn.Printf("settimeofday from %s", no.offset)
-	tv := syscall.NsecToTimeval(time.Now().Add(-no.offset).UnixNano())
-	Warn.Print(syscall.Settimeofday(&tv))
-}
-
-func (s *Service) ntpdAdjtime(no *ntpOffset) (synced bool) {
-
-	d := no.offset
-	old := getOffset()
 	if debug {
-		log.Print("old", old, "d=", no.offset)
+		log.Print("old=", old, " d=", d)
 	}
+
 	d += old
 
 	tmx := &syscall.Timex{}
@@ -87,38 +48,53 @@ func (s *Service) ntpdAdjtime(no *ntpOffset) (synced bool) {
 		log.Printf("%s < %s : %v", absDuration(d), maxAdjust, absDuration(d) < maxAdjust)
 	}
 	if absDuration(d) < maxAdjust {
-		Info.Printf("set offset slew offset=%s", no.offset)
-		tmx.Modes = adjNANO | adjOFFSET | adjMAXERROR | adjESTERROR
+		con := 6 - int64(absDuration(d)/(20*time.Millisecond))
+		if con < 2 {
+			con = 2
+		}
+		log.Printf("set offset slew offset=%s const=%d", d, con)
+		tmx.Modes = adjNANO | adjOFFSET | adjMAXERROR | adjESTERROR | adjTIMECONST
 		tmx.Offset = offsetNsec
 		tmx.Maxerror = 0
 		tmx.Esterror = 0
+		tmx.Constant = con
 	} else {
-		Warn.Print("adjtime failed, offset too big")
-		s.ntpdSettime(no)
-		return false
+		if force {
+			log.Printf("force update offset=%s", d)
+			return setOffset(d)
+		}
+		return fmt.Errorf("offset:%s is over adjust", d.String())
 	}
 
-	switch no.status.leap {
+	switch leap {
 	case LeapIns:
 		tmx.Status |= staINS
 	case LeapDel:
 		tmx.Status |= staDEL
 	}
-
-	rc, err := syscall.Adjtimex(tmx)
-	if rc != 0 {
-		Error.Printf("rc=%d status=%s", rc, statusToString(tmx.Status))
+	var rc int
+	rc, err = syscall.Adjtimex(tmx)
+	if err != nil {
+		return
+	}
+	if rc == -1 {
+		err = fmt.Errorf("sync:rc:%d", rc)
 	}
 
-	if debug {
-		log.Printf("firstAdj=%v, old=%s", firstAdj, old)
-		log.Printf("rc=%v, err=%s", rc, err)
-	}
+	return
+}
 
-	if !firstAdj && old.Nanoseconds() == 0 {
-		synced = true
+func getOffset() (offset time.Duration, err error) {
+	tmx := &syscall.Timex{
+		Status: staNANO,
 	}
-	firstAdj = false
+	var rc int
+	rc, err = syscall.Adjtimex(tmx)
+	if rc == -1 {
+		err = fmt.Errorf("getoffset rc=%d", rc)
+	}
+	// 1us = 1000 ns
+	offset = time.Duration(tmx.Offset)
 	return
 }
 

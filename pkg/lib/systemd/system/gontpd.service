@@ -1,0 +1,17 @@
+[Unit]
+Description=GoNTPd Network time by Go
+Conflicts=systemd-timesyncd.service openntpd.service ntp.service
+ 
+[Service]
+Type=simple
+# Load env vars from /etc/default/ and /etc/sysconfig/ if they exist.
+# Prefixing the path with '-' makes it try to load, but if the file doesn't
+# exist, it continues onward.
+EnvironmentFile=-/etc/default/gontpd
+ExecStart=/usr/bin/gontpd $DAEMON_OPTS
+Restart=on-failure
+WorkingDirectory=/var/lib/gontpd
+CapabilityBoundingSet=CAP_SYS_TIME CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target

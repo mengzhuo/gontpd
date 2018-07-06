@@ -82,6 +82,10 @@ func (d *NTPd) worker(id int) {
 				log.Printf("worker: %s write failed. %s", remoteAddr.String(), err)
 				continue
 			}
+			if d.stat != nil {
+				d.stat.fastCounter.Add(1)
+				d.stat.logIP(remoteAddr)
+			}
 		default:
 			log.Printf("%s not support client request mode:%x",
 				remoteAddr.String(), p[LiVnModePos]&^0xf8)

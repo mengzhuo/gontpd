@@ -114,9 +114,12 @@ func (d *NTPd) setTemplate(op *offsetPeer) {
 
 	SetUint8(d.template, StratumPos, op.resp.Stratum+1)
 	SetInt8(d.template, ClockPrecisionPos, systemPrecision())
-	SetUint32(d.template, RootDelayPos, toNtpShortTime(op.resp.RootDelay))
 
-	SetUint32(d.template, RootDispersionPos, toNtpShortTime(op.resp.RootDispersion))
+	d.delay = op.resp.RootDelay + op.resp.RTT
+	SetUint32(d.template, RootDelayPos, toNtpShortTime(d.delay))
+
+	d.disp = op.resp.RootDispersion + systemDispersion()
+	SetUint32(d.template, RootDispersionPos, toNtpShortTime(d.disp))
 	SetUint64(d.template, ReferenceTimeStamp, toNtpTime(op.resp.ReferenceTime))
 	SetUint32(d.template, ReferIDPos, op.peer.refId)
 

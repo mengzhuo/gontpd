@@ -24,11 +24,20 @@ type NTPd struct {
 
 	peerList []*peer
 	conn     *net.UDPConn
+	stat     *statistic
 	sleep    time.Duration
+
+	delay time.Duration
+	disp  time.Duration
 }
 
 func New(cfg *Config) (d *NTPd) {
-	return &NTPd{cfg: cfg}
+
+	d = &NTPd{cfg: cfg}
+	if cfg.Metric != "" {
+		d.stat = newStatistic(cfg)
+	}
+	return d
 }
 
 func (d *NTPd) Run() (err error) {
@@ -71,16 +80,36 @@ func (d *NTPd) Run() (err error) {
 		}
 
 		d.setTemplate(median)
+		d.updateState(median)
 
 		if absDuration(median.resp.ClockOffset) < time.Millisecond*480 {
-			s := math.Exp2(float64(median.peer.trustLevel))
-			d.sleep = time.Duration(s)*time.Second + 10*time.Second
+			poll := median.peer.trustLevel
+			if poll > d.cfg.MaxPoll {
+				poll = d.cfg.MaxPoll
+			}
+			if poll < d.cfg.MinPoll {
+				poll = d.cfg.MinPoll
+			}
+
+			s := math.Exp2(float64(poll))
+			d.sleep = time.Duration(s) * time.Second
+			if d.sleep < time.Second*10 {
+				d.sleep = time.Second * 10
+			}
 			continue
 		}
 		d.sleep = 10 * time.Second
 		for i := 0; i < len(d.peerList); i++ {
 			d.peerList[i].trustLevel = 1
 		}
+	}
+}
+
+func (d *NTPd) updateState(op *offsetPeer) {
+	if d.stat != nil {
+		d.stat.delayGauge.Set(op.resp.RootDelay.Seconds())
+		d.stat.offsetGauge.Set(op.resp.ClockOffset.Seconds())
+		d.stat.dispGauge.Set(op.resp.RootDispersion.Seconds())
 	}
 }
 

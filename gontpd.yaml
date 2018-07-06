@@ -1,6 +1,10 @@
 forceupdate: true
 listen: ':123'
-workernum: 7
+workernum: 1
+metric: ':7370'
+geodb: GeoLite2-Country.mmdb
+maxpoll: 8
+minpoll: 4
 peerlist:
     - time1.aliyun.com
     - time2.aliyun.com

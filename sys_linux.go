@@ -10,6 +10,7 @@ import (
 )
 
 const maxAdjust = 128 * time.Millisecond
+
 const (
 	NoLeap uint8 = iota
 	LeapIns
@@ -215,4 +216,10 @@ func systemPrecision() int8 {
 	syscall.Adjtimex(tmx)
 	// linux 1 for usec
 	return int8(math.Log2(float64(tmx.Precision) * 1e-6))
+}
+
+func systemDispersion() time.Duration {
+	tmx := &syscall.Timex{}
+	syscall.Adjtimex(tmx)
+	return time.Duration(tmx.Maxerror) * time.Microsecond
 }

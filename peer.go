@@ -44,8 +44,7 @@ func (p *peer) update() {
 		resp, err := ntp.Query(p.addr)
 		if err != nil {
 			log.Printf("%s update failed %s", p.addr, err)
-			p.reply[i] = &ntp.Response{}
-			p.reply[i].Stratum = invalidStratum
+			p.reply[i] = &ntp.Response{Stratum: invalidStratum}
 			continue
 		}
 		goodCount += 1

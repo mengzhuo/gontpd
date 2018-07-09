@@ -75,7 +75,7 @@ func makeSendRefId(addr string) (id uint32) {
 	}
 	ip := ips[0]
 
-	if ip[11] == 255 {
+	if len(ip) > 10 && ip[11] == 255 {
 		// ipv4
 		id = uint32(ip[12])<<24 + uint32(ip[13])<<16 + uint32(ip[14])<<
 			8 + uint32(ip[15])

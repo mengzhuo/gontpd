@@ -1,23 +1,36 @@
 package gontpd
 
 import (
+	"context"
 	"log"
 	"net"
+	"syscall"
 	"time"
 )
 
 func (d *NTPd) listen() {
-	addr, err := net.ResolveUDPAddr("udp", d.cfg.Listen)
-	if err != nil {
-		log.Print(err)
-		return
-	}
 
-	d.conn, err = net.ListenUDP("udp", addr)
+	var operr error
+	lc := net.ListenConfig{func(network, address string, conn syscall.RawConn) (err error) {
+		fn := func(fd uintptr) {
+			operr = syscall.SetsockoptInt(int(fd),
+				syscall.SOL_SOCKET,
+				syscall.SO_REUSEADDR, 1)
+		}
+
+		if err = conn.Control(fn); err != nil {
+			return err
+		}
+
+		err = operr
+		return
+	}}
+	lp, err := lc.ListenPacket(context.Background(), "udp", d.cfg.Listen)
 	if err != nil {
 		log.Print(err)
 		return
 	}
+	d.conn = lp.(*net.UDPConn)
 	d.template = newTemplate()
 	log.Printf("start listen:%s", d.cfg.Listen)
 

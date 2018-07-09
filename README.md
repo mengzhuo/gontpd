@@ -1,11 +1,16 @@
 # gontpd
 
 A sntp daemon focus on high performance stratum >2 serving
+
 Only support Linux
 
 ## install
 ```
 go get github.com/mengzhuo/gontpd/cmd/gontpd
+```
+or
+```
+./make.sh # to build debian package
 ```
 
 ## run
@@ -33,3 +38,5 @@ server:
     - time2.aliyun.com
     - time3.aliyun.com
 ```
+
+## Performance

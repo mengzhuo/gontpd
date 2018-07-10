@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"net"
 	"sort"
 	"sync"
 	"time"
@@ -23,7 +22,6 @@ type NTPd struct {
 	cfg *Config
 
 	peerList []*peer
-	conn     *net.UDPConn
 	stat     *statistic
 	sleep    time.Duration
 

@@ -10,12 +10,21 @@ import (
 
 func (d *NTPd) listen() {
 
+	d.template = newTemplate()
+
+	for i := 0; i < d.cfg.WorkerNum; i++ {
+		go d.worker(i)
+	}
+
+}
+
+func (d *NTPd) makeConn() (conn *net.UDPConn, err error) {
 	var operr error
 	lc := net.ListenConfig{func(network, address string, conn syscall.RawConn) (err error) {
 		fn := func(fd uintptr) {
 			operr = syscall.SetsockoptInt(int(fd),
 				syscall.SOL_SOCKET,
-				syscall.SO_REUSEADDR, 1)
+				syscall.SO_REUSEPORT, 1)
 		}
 
 		if err = conn.Control(fn); err != nil {
@@ -27,17 +36,10 @@ func (d *NTPd) listen() {
 	}}
 	lp, err := lc.ListenPacket(context.Background(), "udp", d.cfg.Listen)
 	if err != nil {
-		log.Print(err)
 		return
 	}
-	d.conn = lp.(*net.UDPConn)
-	d.template = newTemplate()
-	log.Printf("start listen:%s", d.cfg.Listen)
-
-	for i := 0; i < d.cfg.WorkerNum; i++ {
-		go d.worker(i)
-	}
-
+	conn = lp.(*net.UDPConn)
+	return
 }
 
 func (d *NTPd) worker(id int) {
@@ -57,10 +59,16 @@ func (d *NTPd) worker(id int) {
 			log.Printf("Worker: %d exited, reason:%s, read:%d", id, err, n)
 		}
 	}(id)
-	log.Printf("worker %d start", id)
+
+	conn, err := d.makeConn()
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	log.Printf("worker %d startd", id)
 
 	for {
-		n, remoteAddr, err = d.conn.ReadFromUDP(p)
+		n, remoteAddr, err = conn.ReadFromUDP(p)
 		if err != nil {
 			return
 		}
@@ -80,7 +88,7 @@ func (d *NTPd) worker(id int) {
 			copy(errBuf, d.template)
 			SetUint8(errBuf, StratumPos, 0)
 			SetUint32(errBuf, ReferIDPos, 0x41435354)
-			d.conn.WriteToUDP(errBuf, remoteAddr)
+			conn.WriteToUDP(errBuf, remoteAddr)
 
 		case ModeReserved:
 			fallthrough
@@ -90,7 +98,7 @@ func (d *NTPd) worker(id int) {
 				p[TransmitTimeStamp:TransmitTimeStamp+8])
 			SetUint64(p, ReceiveTimeStamp, toNtpTime(receiveTime))
 			SetUint64(p, TransmitTimeStamp, toNtpTime(time.Now()))
-			_, err = d.conn.WriteToUDP(p, remoteAddr)
+			_, err = conn.WriteToUDP(p, remoteAddr)
 			if err != nil {
 				log.Printf("worker: %s write failed. %s", remoteAddr.String(), err)
 				continue

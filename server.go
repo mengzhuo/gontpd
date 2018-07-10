@@ -24,7 +24,7 @@ func (d *NTPd) makeConn() (conn *net.UDPConn, err error) {
 		fn := func(fd uintptr) {
 			operr = syscall.SetsockoptInt(int(fd),
 				syscall.SOL_SOCKET,
-				syscall.SO_REUSEPORT, 1)
+				syscall.SO_REUSEADDR, 1)
 		}
 
 		if err = conn.Control(fn); err != nil {

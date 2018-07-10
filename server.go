@@ -24,7 +24,7 @@ func (d *NTPd) makeConn() (conn *net.UDPConn, err error) {
 		fn := func(fd uintptr) {
 			operr = syscall.SetsockoptInt(int(fd),
 				syscall.SOL_SOCKET,
-				syscall.SO_REUSEADDR, 1)
+				syscall.SO_REUSEPORT, 1)
 		}
 
 		if err = conn.Control(fn); err != nil {
@@ -51,6 +51,7 @@ func (d *NTPd) worker(id int) {
 	)
 
 	p := make([]byte, 48)
+	oob := make([]byte, 1)
 
 	defer func(id int) {
 		if r := recover(); r != nil {
@@ -68,7 +69,7 @@ func (d *NTPd) worker(id int) {
 	log.Printf("worker %d startd", id)
 
 	for {
-		n, remoteAddr, err = conn.ReadFromUDP(p)
+		n, _, _, remoteAddr, err = conn.ReadMsgUDP(p, oob)
 		if err != nil {
 			return
 		}

@@ -6,11 +6,11 @@ import (
 	"net"
 	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 func (d *NTPd) listen() {
-
-	d.template = newTemplate()
 
 	for i := 0; i < d.cfg.WorkerNum; i++ {
 		go d.worker(i)
@@ -19,12 +19,15 @@ func (d *NTPd) listen() {
 }
 
 func (d *NTPd) makeConn() (conn *net.UDPConn, err error) {
+
 	var operr error
-	lc := net.ListenConfig{func(network, address string, conn syscall.RawConn) (err error) {
+
+	cfgFn := func(network, address string, conn syscall.RawConn) (err error) {
+
 		fn := func(fd uintptr) {
 			operr = syscall.SetsockoptInt(int(fd),
 				syscall.SOL_SOCKET,
-				so_REUSEPORT, 1)
+				unix.SO_REUSEPORT, 1)
 		}
 
 		if err = conn.Control(fn); err != nil {
@@ -33,7 +36,8 @@ func (d *NTPd) makeConn() (conn *net.UDPConn, err error) {
 
 		err = operr
 		return
-	}}
+	}
+	lc := net.ListenConfig{Control: cfgFn}
 	lp, err := lc.ListenPacket(context.Background(), "udp", d.cfg.Listen)
 	if err != nil {
 		return
@@ -76,8 +80,10 @@ func (d *NTPd) worker(id int) {
 
 		receiveTime = time.Now()
 		if n < 48 {
-			log.Printf("worker: %s get small packet %d",
-				remoteAddr.String(), n)
+			if debug {
+				log.Printf("worker: %s get small packet %d",
+					remoteAddr.String(), n)
+			}
 			continue
 		}
 
@@ -100,7 +106,7 @@ func (d *NTPd) worker(id int) {
 			SetUint64(p, ReceiveTimeStamp, toNtpTime(receiveTime))
 			SetUint64(p, TransmitTimeStamp, toNtpTime(time.Now()))
 			_, err = conn.WriteToUDP(p, remoteAddr)
-			if err != nil {
+			if err != nil && debug {
 				log.Printf("worker: %s write failed. %s", remoteAddr.String(), err)
 				continue
 			}
@@ -109,9 +115,10 @@ func (d *NTPd) worker(id int) {
 				d.stat.logIP(remoteAddr)
 			}
 		default:
-			log.Printf("%s not support client request mode:%x",
-				remoteAddr.String(), p[LiVnModePos]&^0xf8)
+			if debug {
+				log.Printf("%s not support client request mode:%x",
+					remoteAddr.String(), p[LiVnModePos]&^0xf8)
+			}
 		}
 	}
-
 }

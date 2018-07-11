@@ -31,7 +31,8 @@ type NTPd struct {
 
 func New(cfg *Config) (d *NTPd) {
 
-	d = &NTPd{cfg: cfg}
+	d = &NTPd{cfg: cfg,
+		template: newTemplate()}
 	if cfg.Metric != "" {
 		d.stat = newStatistic(cfg)
 	}
@@ -54,6 +55,7 @@ func (d *NTPd) Run() (err error) {
 	err = syncClock(median.resp.ClockOffset, 0,
 		d.cfg.ForceUpdate)
 	if err != nil {
+		log.Println("sync err:", err, " offset:", median.resp.ClockOffset)
 		return
 	}
 

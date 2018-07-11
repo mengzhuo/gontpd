@@ -1,7 +1,7 @@
 package gontpd
 
 import (
-	"fmt"
+	"errors"
 	"log"
 	"math"
 	"strings"
@@ -19,6 +19,12 @@ const (
 	LeapIns
 	LeapDel
 	NotSync
+)
+
+var (
+	getOffsetFailed      = errors.New("getoffset failed -1")
+	syncOffsetFailed     = errors.New("syncoffset failed -1")
+	overflowOffsetAdjust = errors.New("overflow offset to adjust")
 )
 
 func absDuration(d time.Duration) time.Duration {
@@ -56,7 +62,9 @@ func syncClock(d time.Duration, leap uint8, force bool) (err error) {
 		if con < 2 {
 			con = 2
 		}
-		log.Printf("set offset slew offset=%s const=%d", d, con)
+		if debug {
+			log.Printf("set offset slew offset=%s const=%d", d, con)
+		}
 		tmx.Modes = adjNANO | adjOFFSET | adjMAXERROR | adjESTERROR | adjTIMECONST
 		tmx.Offset = offsetNsec
 		tmx.Maxerror = 0
@@ -64,10 +72,12 @@ func syncClock(d time.Duration, leap uint8, force bool) (err error) {
 		tmx.Constant = con
 	} else {
 		if force {
-			log.Printf("force update offset=%s", d)
+			if debug {
+				log.Printf("force update offset=%s", d)
+			}
 			return setOffset(d)
 		}
-		return fmt.Errorf("offset:%s is over adjust", d.String())
+		return overflowOffsetAdjust
 	}
 
 	switch leap {
@@ -82,7 +92,7 @@ func syncClock(d time.Duration, leap uint8, force bool) (err error) {
 		return
 	}
 	if rc == -1 {
-		err = fmt.Errorf("sync:rc:%d", rc)
+		err = syncOffsetFailed
 	}
 
 	return
@@ -95,7 +105,7 @@ func getOffset() (offset time.Duration, err error) {
 	var rc int
 	rc, err = syscall.Adjtimex(tmx)
 	if rc == -1 {
-		err = fmt.Errorf("getoffset rc=%d", rc)
+		err = getOffsetFailed
 	}
 	// 1us = 1000 ns
 	offset = time.Duration(tmx.Offset)

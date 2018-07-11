@@ -5,6 +5,7 @@
 *.dylib
 *.mmdb
 *.swp
+.log
 
 # Test binary, build with `go test -c`
 *.test

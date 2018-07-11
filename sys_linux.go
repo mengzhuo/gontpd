@@ -9,7 +9,10 @@ import (
 	"time"
 )
 
-const maxAdjust = 128 * time.Millisecond
+const (
+	maxAdjust    = 128 * time.Millisecond
+	so_REUSEPORT = 0xf
+)
 
 const (
 	NoLeap uint8 = iota

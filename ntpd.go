@@ -12,9 +12,7 @@ import (
 	"github.com/beevik/ntp"
 )
 
-var (
-	errNoMedian = errors.New("no median found")
-)
+var errNoMedian = errors.New("no median found")
 
 type NTPd struct {
 	template []byte

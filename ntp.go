@@ -46,9 +46,7 @@ const (
 	TransmitTimeStamp
 )
 
-var (
-	ntpEpoch = time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC)
-)
+var ntpEpoch = time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC)
 
 func toNtpTime(t time.Time) uint64 {
 	nsec := uint64(t.Sub(ntpEpoch))

@@ -10,8 +10,7 @@ import (
 )
 
 const (
-	maxAdjust    = 128 * time.Millisecond
-	so_REUSEPORT = 0xf
+	maxAdjust = 128 * time.Millisecond
 )
 
 const (

@@ -15,7 +15,6 @@ func (d *NTPd) listen() {
 	for i := 0; i < d.cfg.WorkerNum; i++ {
 		go d.worker(i)
 	}
-
 }
 
 func (d *NTPd) makeConn() (conn *net.UDPConn, err error) {

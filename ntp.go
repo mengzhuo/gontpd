@@ -101,6 +101,7 @@ func newTemplate() (t []byte) {
 	SetMode(t, ModeServer)
 	SetUint32(t, ReferIDPos, initRefer)
 	SetInt8(t, PollPos, minPoll)
+	SetUint8(t, StratumPos, 0xff)
 	SetUint64(t, ReferenceTimeStamp, toNtpTime(time.Now()))
 	return
 }
@@ -113,12 +114,13 @@ func (d *NTPd) setTemplate(op *offsetPeer) {
 	SetUint8(d.template, StratumPos, op.resp.Stratum+1)
 	SetInt8(d.template, ClockPrecisionPos, systemPrecision())
 
-	d.delay = op.resp.RootDelay + op.resp.RTT
+	d.delay = op.resp.RootDelay + op.resp.RTT/2
 	SetUint32(d.template, RootDelayPos, toNtpShortTime(d.delay))
 
-	d.disp = op.resp.RootDispersion + systemDispersion()
-	SetUint32(d.template, RootDispersionPos, toNtpShortTime(d.disp))
-	SetUint64(d.template, ReferenceTimeStamp, toNtpTime(op.resp.ReferenceTime))
+	d.disp = op.resp.RootDelay/2 + op.resp.RootDispersion
+	SetUint32(d.template, RootDispersionPos,
+		toNtpShortTime(d.disp))
+	SetUint64(d.template, ReferenceTimeStamp, toNtpTime(op.resp.Time))
 	SetUint32(d.template, ReferIDPos, op.peer.refId)
 
 	SetInt8(d.template, PollPos, int8(op.peer.trustLevel))

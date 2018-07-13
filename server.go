@@ -107,7 +107,6 @@ func (d *NTPd) worker(id int) {
 			_, err = conn.WriteToUDP(p, remoteAddr)
 			if err != nil && debug {
 				log.Printf("worker: %s write failed. %s", remoteAddr.String(), err)
-				continue
 			}
 			if d.stat != nil {
 				d.stat.fastCounter.Add(1)

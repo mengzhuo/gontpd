@@ -87,6 +87,8 @@ func (d *NTPd) worker(id int) {
 			}
 			continue
 		}
+		// BCE
+		_ = p[47]
 
 		// GetMode
 		switch p[LiVnModePos] &^ 0xf8 {

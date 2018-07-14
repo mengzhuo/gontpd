@@ -11,8 +11,7 @@ var (
 
 const (
 	nanoPerSec = 1e9
-	initRefer  = 0x494e4954
-	minPoll    = 5
+	initRefer  = 0x494e4954 // INIT
 )
 
 const (

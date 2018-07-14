@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 	"sort"
 	"sync"
 	"time"
@@ -12,7 +11,23 @@ import (
 	"github.com/beevik/ntp"
 )
 
-var errNoMedian = errors.New("no median found")
+var (
+	errNoMedian = errors.New("no median found")
+	pollTable   = [...]time.Duration{
+		1 << (minPoll + 0) * time.Second,
+		1 << (minPoll + 1) * time.Second,
+		1 << (minPoll + 2) * time.Second,
+		1 << (minPoll + 3) * time.Second,
+		1 << (minPoll + 4) * time.Second,
+		1 << (minPoll + 5) * time.Second,
+		1 << (minPoll + 6) * time.Second,
+		1 << (minPoll + 7) * time.Second,
+		1 << (minPoll + 8) * time.Second,
+		1 << (minPoll + 9) * time.Second,
+		1 << (minPoll + 10) * time.Second,
+		1 << (minPoll + 11) * time.Second,
+	}
+)
 
 type NTPd struct {
 	template []byte
@@ -21,14 +36,20 @@ type NTPd struct {
 
 	peerList []*peer
 	stat     *statistic
-	sleep    time.Duration
 
+	sleep time.Duration
 	delay time.Duration
 	disp  time.Duration
 }
 
 func New(cfg *Config) (d *NTPd) {
 
+	if cfg.MinPoll < minPoll {
+		cfg.MinPoll = minPoll
+	}
+	if cfg.MaxPoll > maxPoll {
+		cfg.MaxPoll = maxPoll
+	}
 	d = &NTPd{cfg: cfg,
 		template: newTemplate()}
 	if cfg.Metric != "" {
@@ -60,9 +81,7 @@ func (d *NTPd) Run() (err error) {
 	go d.listen()
 
 	for {
-		log.Printf("wait for %s", d.sleep.String())
 		time.Sleep(d.sleep)
-
 		d.poll()
 		median = d.find()
 		if median == nil {
@@ -89,25 +108,24 @@ func (d *NTPd) Run() (err error) {
 				poll = d.cfg.MinPoll
 			}
 
-			s := math.Exp2(float64(poll))
-			d.sleep = time.Duration(s) * time.Second
-			if d.sleep < time.Second*10 {
-				d.sleep = time.Second * 10
+			d.sleep = pollTable[poll-minPoll]
+		} else {
+			d.sleep = pollTable[0]
+			for i := 0; i < len(d.peerList); i++ {
+				d.peerList[i].trustLevel = 1
 			}
-			continue
 		}
-		d.sleep = 10 * time.Second
-		for i := 0; i < len(d.peerList); i++ {
-			d.peerList[i].trustLevel = 1
+		if d.stat != nil {
+			d.stat.pollGauge.Set(d.sleep.Seconds())
 		}
 	}
 }
 
 func (d *NTPd) updateState(op *offsetPeer) {
 	if d.stat != nil {
-		d.stat.delayGauge.Set(op.resp.RootDelay.Seconds())
+		d.stat.delayGauge.Set(d.delay.Seconds())
 		d.stat.offsetGauge.Set(op.resp.ClockOffset.Seconds())
-		d.stat.dispGauge.Set(op.resp.RootDispersion.Seconds())
+		d.stat.dispGauge.Set(d.disp.Seconds())
 	}
 }
 
@@ -123,6 +141,7 @@ func (d *NTPd) init() (err error) {
 	if len(d.peerList) == 0 {
 		err = fmt.Errorf("no available peer, tried: %v", d.cfg.PeerList)
 	}
+	d.sleep = pollTable[0]
 	return
 }
 

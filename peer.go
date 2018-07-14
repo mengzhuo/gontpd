@@ -13,7 +13,8 @@ const (
 	replyNum       = 3
 	goodFilter     = 2
 	invalidStratum = 16
-	maxTrustLevel  = 10
+	maxPoll        = 16
+	minPoll        = 5
 )
 
 type peer struct {
@@ -30,7 +31,10 @@ type peer struct {
 
 func newPeer(addr string) (p *peer) {
 	log.Printf("new peer:%s", addr)
-	p = &peer{addr: addr}
+	p = &peer{
+		addr:       addr,
+		trustLevel: minPoll,
+	}
 	p.refId = makeSendRefId(addr)
 	return
 }
@@ -40,7 +44,7 @@ func (p *peer) update() {
 	goodCount := 0
 
 	for i := 0; i < replyNum; i++ {
-		time.Sleep(time.Second)
+		time.Sleep(2 * time.Second)
 		resp, err := ntp.Query(p.addr)
 		if err != nil {
 			log.Printf("%s update failed %s", p.addr, err)
@@ -53,14 +57,16 @@ func (p *peer) update() {
 
 	p.good = goodCount > goodFilter
 
-	log.Printf("%s is good=%v", p.addr, p.good)
+	if debug {
+		log.Printf("%s is good=%v", p.addr, p.good)
+	}
 
 	if p.good {
-		if p.trustLevel < maxTrustLevel {
+		if p.trustLevel < maxPoll {
 			p.trustLevel += 1
 		}
 	} else {
-		if p.trustLevel > 2 {
+		if p.trustLevel > minPoll {
 			p.trustLevel -= 1
 		}
 	}

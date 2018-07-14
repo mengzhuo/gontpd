@@ -13,7 +13,7 @@ import (
 type statistic struct {
 	//stats
 	reqCounter  *prometheus.CounterVec
-	fastCounter prometheus.Counter
+	fastCounter *prometheus.CounterVec
 	offsetGauge prometheus.Gauge
 	dispGauge   prometheus.Gauge
 	delayGauge  prometheus.Gauge
@@ -45,12 +45,12 @@ func newStatistic(cfg *Config) *statistic {
 	}, []string{"cc"})
 
 	prometheus.MustRegister(reqCounter)
-	fastCounter := prometheus.NewCounter(prometheus.CounterOpts{
+	fastCounter := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "ntp",
 		Subsystem: "requests",
 		Name:      "fasttotal",
 		Help:      "The total number of ntp request",
-	})
+	}, []string{"worker"})
 	prometheus.MustRegister(fastCounter)
 
 	offsetGauge := prometheus.NewGauge(prometheus.GaugeOpts{
@@ -101,8 +101,6 @@ func newStatistic(cfg *Config) *statistic {
 }
 
 func (s *statistic) logIP(raddr *net.UDPAddr) {
-
-	s.fastCounter.Inc()
 
 	if s.geoDB == nil {
 		return

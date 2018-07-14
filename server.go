@@ -2,6 +2,7 @@ package gontpd
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"syscall"
@@ -70,6 +71,7 @@ func (d *NTPd) worker(id int) {
 		return
 	}
 	log.Printf("worker %d startd", id)
+	idStr := fmt.Sprintf("%d", id)
 
 	for {
 		n, _, _, remoteAddr, err = conn.ReadMsgUDP(p, oob)
@@ -109,7 +111,7 @@ func (d *NTPd) worker(id int) {
 				log.Printf("worker: %s write failed. %s", remoteAddr.String(), err)
 			}
 			if d.stat != nil {
-				d.stat.fastCounter.Add(1)
+				d.stat.fastCounter.WithLabelValues(idStr).Inc()
 				d.stat.logIP(remoteAddr)
 			}
 		default:

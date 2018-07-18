@@ -11,7 +11,15 @@ var (
 
 const (
 	nanoPerSec = 1e9
-	initRefer  = 0x494e4954 // INIT
+
+	// INIT
+	initRefer = 0x494e4954
+
+	// ACST | The association belongs to a unicast server.
+	acstKoD = 0x41435354
+
+	// RATE | Rate exceeded
+	rateKoD = 0x52415445
 )
 
 const (

@@ -6,6 +6,7 @@ type Config struct {
 	Metric      string
 	Listen      string
 	WorkerNum   int
+	ConnNum     int
 	ForceUpdate bool
 
 	MaxPoll uint8

@@ -13,8 +13,14 @@ import (
 
 func (d *NTPd) listen() {
 
-	for i := 0; i < d.cfg.WorkerNum; i++ {
-		go d.worker(i)
+	for j := 0; j < d.cfg.ConnNum; j++ {
+		conn, err := d.makeConn()
+		if err != nil {
+			log.Fatal(err)
+		}
+		for i := 0; i < d.cfg.WorkerNum; i++ {
+			go d.worker(fmt.Sprintf("%d:%d", j, i), conn)
+		}
 	}
 }
 
@@ -46,7 +52,7 @@ func (d *NTPd) makeConn() (conn *net.UDPConn, err error) {
 	return
 }
 
-func (d *NTPd) worker(id int) {
+func (d *NTPd) worker(id string, conn *net.UDPConn) {
 	var (
 		n           int
 		remoteAddr  *net.UDPAddr
@@ -57,21 +63,15 @@ func (d *NTPd) worker(id int) {
 	p := make([]byte, 48)
 	oob := make([]byte, 1)
 
-	defer func(id int) {
+	defer func(id string) {
 		if r := recover(); r != nil {
-			log.Printf("Worker: %d fatal, reason:%s, read:%d", id, r, n)
+			log.Printf("Worker: %s fatal, reason:%s, read:%d", id, r, n)
 		} else {
-			log.Printf("Worker: %d exited, reason:%s, read:%d", id, err, n)
+			log.Printf("Worker: %s exited, reason:%s, read:%d", id, err, n)
 		}
 	}(id)
 
-	conn, err := d.makeConn()
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	log.Printf("worker %d startd", id)
-	idStr := fmt.Sprintf("%d", id)
+	log.Printf("worker %s started", id)
 
 	for {
 		n, _, _, remoteAddr, err = conn.ReadMsgUDP(p, oob)
@@ -97,7 +97,7 @@ func (d *NTPd) worker(id int) {
 			errBuf := make([]byte, 48)
 			copy(errBuf, d.template)
 			SetUint8(errBuf, StratumPos, 0)
-			SetUint32(errBuf, ReferIDPos, 0x41435354)
+			SetUint32(errBuf, ReferIDPos, acstKoD)
 			conn.WriteToUDP(errBuf, remoteAddr)
 
 		case ModeReserved:
@@ -113,7 +113,7 @@ func (d *NTPd) worker(id int) {
 				log.Printf("worker: %s write failed. %s", remoteAddr.String(), err)
 			}
 			if d.stat != nil {
-				d.stat.fastCounter.WithLabelValues(idStr).Inc()
+				d.stat.fastCounter.WithLabelValues(id).Inc()
 				d.stat.logIP(remoteAddr)
 			}
 		default:

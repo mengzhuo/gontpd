@@ -3,5 +3,7 @@ package gontpd
 import "log"
 
 func init() {
-	log.SetPrefix("[GoNTPD] ")
+	if log.Flags() != 0 {
+		log.SetPrefix("[GoNTPD] ")
+	}
 }

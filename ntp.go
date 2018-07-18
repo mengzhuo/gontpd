@@ -6,7 +6,21 @@ import (
 )
 
 var (
-	epoch = time.Unix(0, 0)
+	epoch     = time.Unix(0, 0)
+	pollTable = [...]time.Duration{
+		1 << (minPoll + 0) * time.Second,
+		1 << (minPoll + 1) * time.Second,
+		1 << (minPoll + 2) * time.Second,
+		1 << (minPoll + 3) * time.Second,
+		1 << (minPoll + 4) * time.Second,
+		1 << (minPoll + 5) * time.Second,
+		1 << (minPoll + 6) * time.Second,
+		1 << (minPoll + 7) * time.Second,
+		1 << (minPoll + 8) * time.Second,
+		1 << (minPoll + 9) * time.Second,
+		1 << (minPoll + 10) * time.Second,
+		1 << (minPoll + 11) * time.Second,
+	}
 )
 
 const (

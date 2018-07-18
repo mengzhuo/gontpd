@@ -1,6 +1,7 @@
 forceupdate: true
 listen: ':123'
-workernum: 1
+workernum: 2
+connnum: 1
 metric: ':7370'
 geodb: GeoLite2-Country.mmdb
 maxpoll: 8

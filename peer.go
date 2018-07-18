@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	replyNum       = 3
+	replyNum       = 4
 	goodFilter     = 2
 	invalidStratum = 16
 	maxPoll        = 16
@@ -18,7 +18,7 @@ const (
 )
 
 type peer struct {
-	addr       string
+	addr       net.IP
 	reply      [replyNum]*ntp.Response
 	offset     time.Duration
 	delay      time.Duration
@@ -27,13 +27,15 @@ type peer struct {
 	stratum    uint8
 	trustLevel uint8
 	good       bool
+	enable     bool
 }
 
-func newPeer(addr string) (p *peer) {
-	log.Printf("new peer:%s", addr)
+func newPeer(addr net.IP) (p *peer) {
+	log.Printf("new peer:%s", addr.String())
 	p = &peer{
 		addr:       addr,
 		trustLevel: minPoll,
+		enable:     true,
 	}
 	p.refId = makeSendRefId(addr)
 	return
@@ -42,13 +44,22 @@ func newPeer(addr string) (p *peer) {
 func (p *peer) update() {
 
 	goodCount := 0
+	p.good = false
+	ts := 2 * time.Second
 
 	for i := 0; i < replyNum; i++ {
-		time.Sleep(2 * time.Second)
-		resp, err := ntp.Query(p.addr)
+		time.Sleep(ts)
+		resp, err := ntp.Query(p.addr.String())
 		if err != nil {
-			log.Printf("%s update failed %s", p.addr, err)
+			log.Printf("%s update failed %s", p.addr.String(), err)
 			p.reply[i] = &ntp.Response{Stratum: invalidStratum}
+			switch resp.KissCode {
+			case "RATE":
+				ts += time.Second
+			case "DENY":
+				p.enable = false
+				return
+			}
 			continue
 		}
 		goodCount += 1
@@ -72,14 +83,7 @@ func (p *peer) update() {
 	}
 }
 
-func makeSendRefId(addr string) (id uint32) {
-
-	ips, err := net.LookupIP(addr)
-	if err != nil || len(ips) == 0 {
-		log.Print(err)
-		return 0
-	}
-	ip := ips[0]
+func makeSendRefId(ip net.IP) (id uint32) {
 
 	if len(ip) > 10 && ip[11] == 255 {
 		// ipv4

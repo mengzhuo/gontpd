@@ -19,6 +19,10 @@ func main() {
 
 	log.SetFlags(*ff)
 
+	if *ff != 0 {
+		log.SetPrefix("[GoNTPd] ")
+	}
+
 	p, err := ioutil.ReadFile(*fp)
 	if err != nil {
 		log.Fatal(err)
@@ -28,7 +32,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("%#v", cfg)
+
+	log.Printf("%+v", cfg)
 	d := gontpd.New(cfg)
 	log.Fatal(d.Run())
 }

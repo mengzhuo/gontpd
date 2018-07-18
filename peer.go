@@ -67,6 +67,7 @@ func (p *peer) update() {
 				if !nerr.Temporary() {
 					log.Printf("%s can't be reach, disabled", p.addr.String())
 					p.enable = false
+					return
 				}
 			}
 			continue

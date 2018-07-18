@@ -50,9 +50,8 @@ func (p *peer) update() {
 	for i := 0; i < replyNum; i++ {
 		time.Sleep(ts)
 		resp, err := ntp.Query(p.addr.String())
-		if err != nil {
-			log.Printf("%s update failed %s", p.addr.String(), err)
-			p.reply[i] = &ntp.Response{Stratum: invalidStratum}
+
+		if resp != nil {
 			switch resp.KissCode {
 			case "RATE":
 				ts += time.Second
@@ -60,8 +59,13 @@ func (p *peer) update() {
 				p.enable = false
 				return
 			}
+		}
+		if err != nil {
+			log.Printf("%s update failed %s", p.addr.String(), err)
+			p.reply[i] = &ntp.Response{Stratum: invalidStratum}
 			continue
 		}
+
 		goodCount += 1
 		p.reply[i] = resp
 	}

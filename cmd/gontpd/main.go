@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 
@@ -12,10 +13,18 @@ import (
 var (
 	fp = flag.String("c", "gontpd.yaml", "yaml config file")
 	ff = flag.Int("f", 16, "log flag")
+	fv = flag.Bool("v", false, "print version")
+
+	Version = "dev"
 )
 
 func main() {
 	flag.Parse()
+
+	if *fv {
+		fmt.Println(Version)
+		return
+	}
 
 	log.SetFlags(*ff)
 

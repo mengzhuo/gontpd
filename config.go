@@ -7,6 +7,7 @@ type Config struct {
 	Listen      string
 	WorkerNum   int
 	ConnNum     int
+	CacheSize   int
 	ForceUpdate bool
 
 	MaxPoll uint8

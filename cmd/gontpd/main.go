@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/mengzhuo/gontpd"
 	yaml "gopkg.in/yaml.v2"
@@ -14,6 +16,8 @@ var (
 	fp = flag.String("c", "gontpd.yaml", "yaml config file")
 	ff = flag.Int("f", 16, "log flag")
 	fv = flag.Bool("v", false, "print version")
+
+	fpprof = flag.String("pprof", "", "pprof listen")
 
 	Version = "dev"
 )
@@ -30,6 +34,10 @@ func main() {
 
 	if *ff != 0 {
 		log.SetPrefix("[GoNTPd] ")
+	}
+
+	if *fpprof != "" {
+		go http.ListenAndServe(*fpprof, nil)
 	}
 
 	p, err := ioutil.ReadFile(*fp)

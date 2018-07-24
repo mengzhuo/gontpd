@@ -34,6 +34,11 @@ func New(cfg *Config) (d *NTPd) {
 	if cfg.MaxPoll > maxPoll {
 		cfg.MaxPoll = maxPoll
 	}
+
+	if cfg.CacheSize <= 0 {
+		cfg.CacheSize = 1000
+	}
+
 	d = &NTPd{cfg: cfg,
 		template: newTemplate()}
 	if cfg.Metric != "" {
@@ -61,6 +66,7 @@ func (d *NTPd) Run() (err error) {
 		log.Println("sync err:", err, " offset:", median.resp.ClockOffset)
 		return
 	}
+	d.setTemplate(median)
 
 	go d.listen()
 

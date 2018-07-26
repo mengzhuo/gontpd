@@ -89,7 +89,7 @@ func (d *NTPd) Run() (err error) {
 		d.setTemplate(median)
 		d.updateState(median)
 
-		if absDuration(median.resp.ClockOffset) < time.Millisecond*480 {
+		if absDuration(median.resp.ClockOffset) < time.Millisecond*20 {
 			poll := median.peer.trustLevel
 			if poll > d.cfg.MaxPoll {
 				poll = d.cfg.MaxPoll

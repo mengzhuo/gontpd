@@ -24,7 +24,7 @@ func (d *NTPd) listen() {
 			id := fmt.Sprintf("%d:%d", j, i)
 			w := worker{
 				id, newLRU(d.cfg.CacheSize),
-				conn, d.stat, d, limit,
+				conn, d.stat, d,
 			}
 			go w.Work()
 		}
@@ -37,8 +37,6 @@ type worker struct {
 	conn *net.UDPConn
 	stat *statistic
 	d    *NTPd
-
-	reqLimit int64
 }
 
 func (d *NTPd) makeConn() (conn *net.UDPConn, err error) {
@@ -74,11 +72,14 @@ func (d *NTPd) makeConn() (conn *net.UDPConn, err error) {
 
 func (w *worker) Work() {
 	var (
-		n           int
-		remoteAddr  *net.UDPAddr
-		err         error
 		receiveTime time.Time
-		addrS       string
+		remoteAddr  *net.UDPAddr
+
+		err      error
+		addrS    string
+		lastUnix int64
+		n        int
+		ok       bool
 	)
 	p := make([]byte, 48)
 	oob := make([]byte, 1)
@@ -122,16 +123,17 @@ func (w *worker) Work() {
 			continue
 		}
 
-		addrS = remoteAddr.String()
-		if w.reqLimit > 0 {
-			lastUnix, ok := w.lru.Get(addrS)
-			if ok && receiveTime.Unix()-lastUnix < w.reqLimit {
-				w.sendError(remoteAddr, rateKoD)
-				if w.stat != nil {
-					w.stat.fastDropCounter.WithLabelValues("rate").Inc()
-				}
-				continue
+		addrS = remoteAddr.IP.String()
+		lastUnix, ok = w.lru.Get(addrS)
+		if ok && receiveTime.Unix()-lastUnix < limit {
+			if debug {
+				log.Println(receiveTime.Unix()-lastUnix, ok)
 			}
+			w.sendError(remoteAddr, rateKoD)
+			if w.stat != nil {
+				w.stat.fastDropCounter.WithLabelValues("rate").Inc()
+			}
+			continue
 		}
 
 		// BCE

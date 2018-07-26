@@ -150,11 +150,16 @@ func (w *worker) logIP(raddr *net.UDPAddr) {
 	if !ok {
 		country, err := w.stat.geoDB.LookupIP(raddr.IP)
 		if err != nil {
-			log.Print(err)
+			return
+		}
+		if country.Country == nil {
 			return
 		}
 		cc = country.Country.Code
 		w.lru.Add(s, cc)
+	}
+	if cc == "" {
+		return
 	}
 	w.stat.reqCounter.WithLabelValues(cc).Inc()
 }

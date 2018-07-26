@@ -148,12 +148,12 @@ func (w *worker) logIP(raddr *net.UDPAddr) {
 	s := raddr.IP.String()
 	cc, ok := w.lru.Get(s)
 	if !ok {
-		country, err := w.stat.geoDB.Country(raddr.IP)
+		country, err := w.stat.geoDB.LookupIP(raddr.IP)
 		if err != nil {
 			log.Print(err)
 			return
 		}
-		cc = country.Country.IsoCode
+		cc = country.Country.Code
 		w.lru.Add(s, cc)
 	}
 	w.stat.reqCounter.WithLabelValues(cc).Inc()

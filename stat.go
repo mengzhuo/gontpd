@@ -2,12 +2,11 @@ package gontpd
 
 import (
 	"log"
-	"net"
 	"net/http"
 
-	geoip2 "github.com/oschwald/geoip2-golang"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rainycape/geoip"
 )
 
 type statistic struct {
@@ -19,18 +18,18 @@ type statistic struct {
 	delayGauge  prometheus.Gauge
 	pollGauge   prometheus.Gauge
 	driftGauge  prometheus.Gauge
-	geoDB       *geoip2.Reader
+	geoDB       *geoip.GeoIP
 }
 
 func newStatistic(cfg *Config) *statistic {
 
 	var (
-		geoDB *geoip2.Reader
+		geoDB *geoip.GeoIP
 		err   error
 	)
 
 	if cfg.GeoDB != "" {
-		geoDB, err = geoip2.Open(cfg.GeoDB)
+		geoDB, err = geoip.Open(cfg.GeoDB)
 		if err != nil {
 			log.Fatal(err)
 			return nil
@@ -98,18 +97,4 @@ func newStatistic(cfg *Config) *statistic {
 		pollGauge:   pollGauge,
 		geoDB:       geoDB,
 	}
-}
-
-func (s *statistic) logIP(raddr *net.UDPAddr) {
-
-	if s.geoDB == nil {
-		return
-	}
-
-	country, err := s.geoDB.Country(raddr.IP)
-	if err != nil {
-		log.Print("stat ip err=", err)
-		return
-	}
-	s.reqCounter.WithLabelValues(country.Country.IsoCode).Inc()
 }

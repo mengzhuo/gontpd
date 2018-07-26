@@ -135,7 +135,7 @@ func (d *NTPd) init() (err error) {
 	for _, ip := range pool {
 		p := newPeer(ip)
 		if p == nil {
-			log.Print("peer:%s init failed", ip)
+			log.Printf("peer:%s init failed", ip.String())
 		}
 		d.peerList = append(d.peerList, p)
 	}

@@ -11,14 +11,15 @@ import (
 
 type statistic struct {
 	//stats
-	reqCounter  *prometheus.CounterVec
-	fastCounter *prometheus.CounterVec
-	offsetGauge prometheus.Gauge
-	dispGauge   prometheus.Gauge
-	delayGauge  prometheus.Gauge
-	pollGauge   prometheus.Gauge
-	driftGauge  prometheus.Gauge
-	geoDB       *geoip.GeoIP
+	reqCounter      *prometheus.CounterVec
+	fastCounter     prometheus.Counter
+	fastDropCounter *prometheus.CounterVec
+	offsetGauge     prometheus.Gauge
+	dispGauge       prometheus.Gauge
+	delayGauge      prometheus.Gauge
+	pollGauge       prometheus.Gauge
+	driftGauge      prometheus.Gauge
+	geoDB           *geoip.GeoIP
 }
 
 func newStatistic(cfg *Config) *statistic {
@@ -42,15 +43,23 @@ func newStatistic(cfg *Config) *statistic {
 		Name:      "total",
 		Help:      "The total number of ntp request",
 	}, []string{"cc"})
-
 	prometheus.MustRegister(reqCounter)
-	fastCounter := prometheus.NewCounterVec(prometheus.CounterOpts{
+
+	fastCounter := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: "ntp",
 		Subsystem: "requests",
 		Name:      "fasttotal",
 		Help:      "The total number of ntp request",
-	}, []string{"worker"})
+	})
 	prometheus.MustRegister(fastCounter)
+
+	fastDropCounter := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "ntp",
+		Subsystem: "requests",
+		Name:      "fastdrop",
+		Help:      "The total dropped ntp request",
+	}, []string{"reason"})
+	prometheus.MustRegister(fastDropCounter)
 
 	offsetGauge := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "ntp",
@@ -89,12 +98,13 @@ func newStatistic(cfg *Config) *statistic {
 	go http.ListenAndServe(cfg.Metric, nil)
 
 	return &statistic{
-		reqCounter:  reqCounter,
-		fastCounter: fastCounter,
-		offsetGauge: offsetGauge,
-		dispGauge:   dispGauge,
-		delayGauge:  delayGauge,
-		pollGauge:   pollGauge,
-		geoDB:       geoDB,
+		reqCounter:      reqCounter,
+		fastCounter:     fastCounter,
+		fastDropCounter: fastDropCounter,
+		offsetGauge:     offsetGauge,
+		dispGauge:       dispGauge,
+		delayGauge:      delayGauge,
+		pollGauge:       pollGauge,
+		geoDB:           geoDB,
 	}
 }

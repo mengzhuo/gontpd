@@ -16,17 +16,18 @@ func newLRU(s int) *lru {
 }
 
 type entry struct {
-	key, val string
+	key      string
+	lastUnix int64
 }
 
-func (u *lru) Add(key, value string) {
+func (u *lru) Add(key string, val int64) {
 	if ee, ok := u.cache[key]; ok {
 		u.ll.MoveToFront(ee)
-		ee.Value.(*entry).val = value
+		ee.Value.(*entry).lastUnix = val
 		return
 	}
 
-	ele := u.ll.PushFront(&entry{key, value})
+	ele := u.ll.PushFront(&entry{key, val})
 	u.cache[key] = ele
 	if u.maxEntry < u.ll.Len() {
 		u.RemoveOldest()
@@ -40,11 +41,10 @@ func (u *lru) RemoveOldest() {
 	u.ll.Remove(ele)
 }
 
-func (u *lru) Get(key string) (value string, ok bool) {
+func (u *lru) Get(key string) (val int64, ok bool) {
 	var ele *list.Element
 	if ele, ok = u.cache[key]; ok {
-		value = ele.Value.(*entry).val
-		return
+		val = ele.Value.(*entry).lastUnix
 	}
 	return
 }

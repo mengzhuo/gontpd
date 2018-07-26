@@ -1,6 +1,9 @@
 forceupdate: true
 listen: ':123'
 workernum: 1
+connnum: 1
+cachesize: 8196
+landrop: true
 metric: ':7370'
 geodb: 
 maxpoll: 9

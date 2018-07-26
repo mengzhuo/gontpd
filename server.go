@@ -11,6 +11,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const limit = 4
+
 func (d *NTPd) listen() {
 
 	for j := 0; j < d.cfg.ConnNum; j++ {
@@ -22,7 +24,7 @@ func (d *NTPd) listen() {
 			id := fmt.Sprintf("%d:%d", j, i)
 			w := worker{
 				id, newLRU(d.cfg.CacheSize),
-				conn, d.stat, d,
+				conn, d.stat, d, limit,
 			}
 			go w.Work()
 		}
@@ -35,6 +37,8 @@ type worker struct {
 	conn *net.UDPConn
 	stat *statistic
 	d    *NTPd
+
+	reqLimit int64
 }
 
 func (d *NTPd) makeConn() (conn *net.UDPConn, err error) {
@@ -74,8 +78,8 @@ func (w *worker) Work() {
 		remoteAddr  *net.UDPAddr
 		err         error
 		receiveTime time.Time
+		addrS       string
 	)
-
 	p := make([]byte, 48)
 	oob := make([]byte, 1)
 
@@ -101,21 +105,45 @@ func (w *worker) Work() {
 				log.Printf("worker: %s get small packet %d",
 					remoteAddr.String(), n)
 			}
+			if w.stat != nil {
+				w.stat.fastDropCounter.WithLabelValues("small_packet").Inc()
+			}
 			continue
 		}
+
+		if w.d.cfg.LanDrop && isLan(remoteAddr.IP) {
+			if debug {
+				log.Printf("worker: %s get lan dest",
+					remoteAddr.String())
+			}
+			if w.stat != nil {
+				w.stat.fastDropCounter.WithLabelValues("lan_dest").Inc()
+			}
+			continue
+		}
+
+		addrS = remoteAddr.String()
+		if w.reqLimit > 0 {
+			lastUnix, ok := w.lru.Get(addrS)
+			if ok && receiveTime.Unix()-lastUnix < w.reqLimit {
+				w.sendError(remoteAddr, rateKoD)
+				if w.stat != nil {
+					w.stat.fastDropCounter.WithLabelValues("rate").Inc()
+				}
+				continue
+			}
+		}
+
 		// BCE
 		_ = p[47]
 
+		w.lru.Add(addrS, receiveTime.Unix())
+
 		// GetMode
+
 		switch p[LiVnModePos] &^ 0xf8 {
 		case ModeSymmetricActive:
-			// return
-			errBuf := make([]byte, 48)
-			copy(errBuf, w.d.template)
-			SetUint8(errBuf, StratumPos, 0)
-			SetUint32(errBuf, ReferIDPos, acstKoD)
-			w.conn.WriteToUDP(errBuf, remoteAddr)
-
+			w.sendError(remoteAddr, acstKoD)
 		case ModeReserved:
 			fallthrough
 		case ModeClient:
@@ -123,13 +151,14 @@ func (w *worker) Work() {
 			copy(p[OriginTimeStamp:OriginTimeStamp+8],
 				p[TransmitTimeStamp:TransmitTimeStamp+8])
 			SetUint64(p, ReceiveTimeStamp, toNtpTime(receiveTime))
+
 			SetUint64(p, TransmitTimeStamp, toNtpTime(time.Now()))
 			_, err = w.conn.WriteToUDP(p, remoteAddr)
 			if err != nil && debug {
 				log.Printf("worker: %s write failed. %s", remoteAddr.String(), err)
 			}
 			if w.stat != nil {
-				w.stat.fastCounter.WithLabelValues(w.id).Inc()
+				w.stat.fastCounter.Inc()
 				w.logIP(remoteAddr)
 			}
 		default:
@@ -137,29 +166,32 @@ func (w *worker) Work() {
 				log.Printf("%s not support client request mode:%x",
 					remoteAddr.String(), p[LiVnModePos]&^0xf8)
 			}
+			if w.stat != nil {
+				w.stat.fastDropCounter.WithLabelValues("unknown_mode").Inc()
+			}
 		}
 	}
+}
+
+func (w *worker) sendError(raddr *net.UDPAddr, err uint32) {
+	// return
+	errBuf := make([]byte, 48)
+	copy(errBuf, w.d.template)
+	SetUint8(errBuf, StratumPos, 0)
+	SetUint32(errBuf, ReferIDPos, err)
+	w.conn.WriteToUDP(errBuf, raddr)
 }
 
 func (w *worker) logIP(raddr *net.UDPAddr) {
 	if w.stat.geoDB == nil {
 		return
 	}
-	s := raddr.IP.String()
-	cc, ok := w.lru.Get(s)
-	if !ok {
-		country, err := w.stat.geoDB.LookupIP(raddr.IP)
-		if err != nil {
-			return
-		}
-		if country.Country == nil {
-			return
-		}
-		cc = country.Country.Code
-		w.lru.Add(s, cc)
-	}
-	if cc == "" {
+	country, err := w.stat.geoDB.LookupIP(raddr.IP)
+	if err != nil {
 		return
 	}
-	w.stat.reqCounter.WithLabelValues(cc).Inc()
+	if country.Country == nil {
+		return
+	}
+	w.stat.reqCounter.WithLabelValues(country.Country.Code).Inc()
 }

@@ -8,6 +8,7 @@ type Config struct {
 	WorkerNum   int
 	ConnNum     int
 	CacheSize   int
+	LanDrop     bool
 	ForceUpdate bool
 
 	MaxPoll uint8

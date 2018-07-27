@@ -11,7 +11,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const limit = 4
+// minimum headway time is 2 seconds, https://www.eecis.udel.edu/~mills/ntp/html/rate.html
+const limit = 2
 
 func (d *NTPd) listen() {
 
@@ -123,21 +124,21 @@ func (w *worker) Work() {
 			continue
 		}
 
+		// BCE
+		_ = p[47]
+
 		addrS = remoteAddr.IP.String()
 		lastUnix, ok = w.lru.Get(addrS)
 		if ok && receiveTime.Unix()-lastUnix < limit {
 			if debug {
 				log.Println(receiveTime.Unix()-lastUnix, ok)
 			}
-			w.sendError(remoteAddr, rateKoD)
+			w.sendError(p, remoteAddr, rateKoD)
 			if w.stat != nil {
 				w.stat.fastDropCounter.WithLabelValues("rate").Inc()
 			}
 			continue
 		}
-
-		// BCE
-		_ = p[47]
 
 		w.lru.Add(addrS, receiveTime.Unix())
 
@@ -145,7 +146,7 @@ func (w *worker) Work() {
 
 		switch p[LiVnModePos] &^ 0xf8 {
 		case ModeSymmetricActive:
-			w.sendError(remoteAddr, acstKoD)
+			w.sendError(p, remoteAddr, acstKoD)
 		case ModeReserved:
 			fallthrough
 		case ModeClient:
@@ -175,13 +176,14 @@ func (w *worker) Work() {
 	}
 }
 
-func (w *worker) sendError(raddr *net.UDPAddr, err uint32) {
-	// return
-	errBuf := make([]byte, 48)
-	copy(errBuf, w.d.template)
-	SetUint8(errBuf, StratumPos, 0)
-	SetUint32(errBuf, ReferIDPos, err)
-	w.conn.WriteToUDP(errBuf, raddr)
+func (w *worker) sendError(p []byte, raddr *net.UDPAddr, err uint32) {
+	// avoid spoof
+	copy(p[0:OriginTimeStamp], w.d.template)
+	copy(p[OriginTimeStamp:OriginTimeStamp+8],
+		p[TransmitTimeStamp:TransmitTimeStamp+8])
+	SetUint8(p, StratumPos, 0)
+	SetUint32(p, ReferIDPos, err)
+	w.conn.WriteToUDP(p, raddr)
 }
 
 func (w *worker) logIP(raddr *net.UDPAddr) {

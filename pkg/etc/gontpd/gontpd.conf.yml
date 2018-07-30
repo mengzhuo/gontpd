@@ -1,3 +1,4 @@
+max_std: 50ms
 listen: ':123'
 force_update: true
 worker_num: 1

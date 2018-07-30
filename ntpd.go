@@ -153,7 +153,7 @@ func (d *NTPd) init() (err error) {
 func (d *NTPd) poll() {
 	for _, p := range d.peerList {
 		if p.enable {
-			p.update()
+			p.update(d.cfg.MaxStd)
 		}
 	}
 

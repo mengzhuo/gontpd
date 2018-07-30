@@ -113,6 +113,9 @@ func (w *worker) Work() {
 			continue
 		}
 
+		// BCE
+		_ = p[47]
+
 		if w.d.cfg.LanDrop && isLan(remoteAddr.IP) {
 			if debug {
 				log.Printf("worker: %s get lan dest",
@@ -123,9 +126,6 @@ func (w *worker) Work() {
 			}
 			continue
 		}
-
-		// BCE
-		_ = p[47]
 
 		addrS = remoteAddr.IP.String()
 		lastUnix, ok = w.lru.Get(addrS)

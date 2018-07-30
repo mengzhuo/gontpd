@@ -1,6 +1,10 @@
 package gontpd
 
+import "time"
+
 type Config struct {
+	MaxStd time.Duration `yaml:"max_std"`
+
 	PeerList  []string `yaml:"peer_list"`
 	GeoDB     string   `yaml:"geo_db"`
 	Metric    string   `yaml:"metric"`

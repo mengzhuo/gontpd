@@ -11,7 +11,7 @@ import (
 
 const (
 	replyNum       = 4
-	goodFilter     = 2
+	goodFilter     = replyNum - 1
 	invalidStratum = 16
 	maxPoll        = 16
 	minPoll        = 5
@@ -41,9 +41,8 @@ func newPeer(addr net.IP) (p *peer) {
 	return
 }
 
-func (p *peer) update() {
+func (p *peer) update(maxstd time.Duration) {
 
-	goodCount := 0
 	p.good = false
 	ts := 2 * time.Second
 	goodList := []time.Duration{}
@@ -74,18 +73,17 @@ func (p *peer) update() {
 			continue
 		}
 
-		goodCount += 1
 		goodList = append(goodList, resp.ClockOffset)
 		p.reply[i] = resp
 	}
 
-	if goodCount < goodFilter {
+	if len(goodList) < goodFilter {
 		log.Printf("peer:%s has not enough good response", p.addr.String())
 		p.good = false
 		return
 	}
 
-	if sd := stddev(goodList); 10*time.Millisecond < sd {
+	if sd := stddev(goodList); maxstd < sd {
 		log.Printf("peer:%s stddev out of range:%s", p.addr.String(), sd)
 		p.good = false
 		return

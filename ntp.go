@@ -146,3 +146,33 @@ func (d *NTPd) setTemplate(op *offsetPeer) {
 
 	SetInt8(d.template, PollPos, int8(op.peer.trustLevel))
 }
+
+func stddev(pl []time.Duration) time.Duration {
+	var sum time.Duration
+	for _, p := range pl {
+		sum += absDuration(p)
+	}
+	avg := sum / time.Duration(len(pl))
+	sum = 0
+	al := make([]time.Duration, len(pl))
+	for i := 0; i < len(pl); i++ {
+		off := pl[i] - avg
+		al[i] = off * off
+		sum += al[i]
+	}
+	sum = sum / time.Duration(len(pl))
+	return time.Duration(uintSqrt(uint64(sum)))
+}
+
+// https://en.wikipedia.org/wiki/Integer_square_root
+func uintSqrt(n uint64) uint64 {
+	if n < 2 {
+		return n
+	}
+	smallCandidate := uintSqrt(n>>2) << 1
+	largeCandidate := smallCandidate + 1
+	if largeCandidate*largeCandidate > n {
+		return smallCandidate
+	}
+	return largeCandidate
+}

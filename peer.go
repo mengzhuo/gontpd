@@ -46,6 +46,7 @@ func (p *peer) update() {
 	goodCount := 0
 	p.good = false
 	ts := 2 * time.Second
+	goodList := []time.Duration{}
 
 	for i := 0; i < replyNum; i++ {
 		time.Sleep(ts)
@@ -74,24 +75,28 @@ func (p *peer) update() {
 		}
 
 		goodCount += 1
+		goodList = append(goodList, resp.ClockOffset)
 		p.reply[i] = resp
 	}
 
-	p.good = goodCount > goodFilter
+	if goodCount < goodFilter {
+		log.Printf("peer:%s has not enough good response", p.addr.String())
+		p.good = false
+		return
+	}
+
+	if sd := stddev(goodList); 10*time.Millisecond < sd {
+		log.Printf("peer:%s stddev out of range:%s", p.addr.String(), sd)
+		p.good = false
+		return
+	}
+
+	p.good = true
 
 	if debug {
 		log.Printf("%s is good=%v", p.addr, p.good)
 	}
 
-	if p.good {
-		if p.trustLevel < maxPoll {
-			p.trustLevel += 1
-		}
-	} else {
-		if p.trustLevel > minPoll {
-			p.trustLevel -= 1
-		}
-	}
 }
 
 func makeSendRefId(ip net.IP) (id uint32) {

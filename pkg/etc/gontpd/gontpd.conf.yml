@@ -1,14 +1,15 @@
-forceupdate: true
 listen: ':123'
-workernum: 1
-connnum: 1
-cachesize: 8196
-landrop: true
+force_update: true
+worker_num: 1
+conn_num: 1
+rate_size: 8196
+lan_drop: true
+rate_drop: true
 metric: ':7370'
-geodb: 
-maxpoll: 9
-minpoll: 4
-peerlist:
+geo_db: 
+max_poll: 9
+min_poll: 4
+peer_list:
     - time1.apple.com
     - time2.apple.com
     - time3.apple.com

@@ -35,8 +35,8 @@ func New(cfg *Config) (d *NTPd) {
 		cfg.MaxPoll = maxPoll
 	}
 
-	if cfg.CacheSize <= 0 {
-		cfg.CacheSize = 1000
+	if cfg.RateSize <= 0 {
+		cfg.RateSize = 1000
 	}
 
 	d = &NTPd{cfg: cfg,

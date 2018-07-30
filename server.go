@@ -24,7 +24,7 @@ func (d *NTPd) listen() {
 		for i := 0; i < d.cfg.WorkerNum; i++ {
 			id := fmt.Sprintf("%d:%d", j, i)
 			w := worker{
-				id, newLRU(d.cfg.CacheSize),
+				id, newLRU(d.cfg.RateSize),
 				conn, d.stat, d,
 			}
 			go w.Work()
@@ -133,7 +133,10 @@ func (w *worker) Work() {
 			if debug {
 				log.Println(receiveTime.Unix()-lastUnix, ok)
 			}
-			w.sendError(p, remoteAddr, rateKoD)
+
+			if !w.d.cfg.RateDrop {
+				w.sendError(p, remoteAddr, rateKoD)
+			}
 			if w.stat != nil {
 				w.stat.fastDropCounter.WithLabelValues("rate").Inc()
 			}
@@ -162,7 +165,9 @@ func (w *worker) Work() {
 			}
 			if w.stat != nil {
 				w.stat.fastCounter.Inc()
-				w.logIP(remoteAddr)
+				if w.stat.geoDB != nil {
+					w.logIP(remoteAddr)
+				}
 			}
 		default:
 			if debug {
@@ -187,9 +192,6 @@ func (w *worker) sendError(p []byte, raddr *net.UDPAddr, err uint32) {
 }
 
 func (w *worker) logIP(raddr *net.UDPAddr) {
-	if w.stat.geoDB == nil {
-		return
-	}
 	country, err := w.stat.geoDB.LookupIP(raddr.IP)
 	if err != nil {
 		return

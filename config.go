@@ -1,16 +1,18 @@
 package gontpd
 
 type Config struct {
-	PeerList    []string
-	GeoDB       string
-	Metric      string
-	Listen      string
-	WorkerNum   int
-	ConnNum     int
-	CacheSize   int
-	LanDrop     bool
-	ForceUpdate bool
+	PeerList  []string `yaml:"peer_list"`
+	GeoDB     string   `yaml:"geo_db"`
+	Metric    string   `yaml:"metric"`
+	Listen    string   `yaml:"listen"`
+	WorkerNum int      `yaml:"worker_num"`
+	ConnNum   int      `yaml:"conn_num"`
+	RateSize  int      `yaml:"rate_size"`
 
-	MaxPoll uint8
-	MinPoll uint8
+	RateDrop    bool `yaml:"rate_drop"`
+	LanDrop     bool `yaml:"lan_drop"`
+	ForceUpdate bool `yaml:"force_update"`
+
+	MaxPoll uint8 `yaml:"max_poll"`
+	MinPoll uint8 `yaml:"min_poll"`
 }

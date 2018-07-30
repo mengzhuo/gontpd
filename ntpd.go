@@ -98,6 +98,12 @@ func (d *NTPd) Run() (err error) {
 				poll = d.cfg.MinPoll
 			}
 
+			for _, p := range d.peerList {
+				if p.good && p.trustLevel < d.cfg.MaxPoll {
+					p.trustLevel += 1
+				}
+			}
+
 			d.sleep = pollTable[poll-minPoll]
 		} else {
 			d.sleep = pollTable[0]

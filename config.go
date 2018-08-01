@@ -5,6 +5,7 @@ import "time"
 type Config struct {
 	MaxStd time.Duration `yaml:"max_std"`
 
+	DropCIDR  []string `yaml:"drop_cidr"`
 	PeerList  []string `yaml:"peer_list"`
 	GeoDB     string   `yaml:"geo_db"`
 	Metric    string   `yaml:"metric"`
@@ -14,7 +15,6 @@ type Config struct {
 	RateSize  int      `yaml:"rate_size"`
 
 	RateDrop    bool `yaml:"rate_drop"`
-	LanDrop     bool `yaml:"lan_drop"`
 	ForceUpdate bool `yaml:"force_update"`
 
 	MaxPoll uint8 `yaml:"max_poll"`

@@ -77,7 +77,6 @@ func (w *worker) Work() {
 		remoteAddr  *net.UDPAddr
 
 		err      error
-		addrS    string
 		lastUnix int64
 		n        int
 		ok       bool
@@ -113,22 +112,21 @@ func (w *worker) Work() {
 			continue
 		}
 
-		// BCE
-		_ = p[47]
-
-		if w.d.cfg.LanDrop && isLan(remoteAddr.IP) {
+		if w.d.dropTable.contains(remoteAddr.IP) {
 			if debug {
-				log.Printf("worker: %s get lan dest",
-					remoteAddr.String())
+				log.Printf("worker: %s drop packet %d",
+					remoteAddr.String(), n)
 			}
 			if w.stat != nil {
-				w.stat.fastDropCounter.WithLabelValues("lan_dest").Inc()
+				w.stat.fastDropCounter.WithLabelValues("acl_deny").Inc()
 			}
 			continue
 		}
 
-		addrS = remoteAddr.IP.String()
-		lastUnix, ok = w.lru.Get(addrS)
+		// BCE
+		_ = p[47]
+
+		lastUnix, ok = w.lru.Get(remoteAddr.IP)
 		if ok && receiveTime.Unix()-lastUnix < limit {
 			if debug {
 				log.Println(receiveTime.Unix()-lastUnix, ok)
@@ -143,7 +141,7 @@ func (w *worker) Work() {
 			continue
 		}
 
-		w.lru.Add(addrS, receiveTime.Unix())
+		w.lru.Add(remoteAddr.IP, receiveTime.Unix())
 
 		// GetMode
 

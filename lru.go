@@ -1,6 +1,9 @@
 package gontpd
 
-import "container/list"
+import (
+	"container/list"
+	"net"
+)
 
 type lru struct {
 	cache    map[string]*list.Element
@@ -16,19 +19,19 @@ func newLRU(s int) *lru {
 }
 
 type entry struct {
-	key      string
+	key      net.IP
 	lastUnix int64
 }
 
-func (u *lru) Add(key string, val int64) {
-	if ee, ok := u.cache[key]; ok {
+func (u *lru) Add(ip net.IP, val int64) {
+	if ee, ok := u.cache[string(ip)]; ok {
 		u.ll.MoveToFront(ee)
 		ee.Value.(*entry).lastUnix = val
 		return
 	}
 
-	ele := u.ll.PushFront(&entry{key, val})
-	u.cache[key] = ele
+	ele := u.ll.PushFront(&entry{ip, val})
+	u.cache[string(ip)] = ele
 	if u.maxEntry < u.ll.Len() {
 		u.RemoveOldest()
 	}
@@ -37,13 +40,13 @@ func (u *lru) Add(key string, val int64) {
 func (u *lru) RemoveOldest() {
 	ele := u.ll.Back()
 	ee := ele.Value.(*entry)
-	delete(u.cache, ee.key)
+	delete(u.cache, string(ee.key))
 	u.ll.Remove(ele)
 }
 
-func (u *lru) Get(key string) (val int64, ok bool) {
+func (u *lru) Get(ip net.IP) (val int64, ok bool) {
 	var ele *list.Element
-	if ele, ok = u.cache[key]; ok {
+	if ele, ok = u.cache[string(ip)]; ok {
 		val = ele.Value.(*entry).lastUnix
 	}
 	return

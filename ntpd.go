@@ -18,8 +18,9 @@ type NTPd struct {
 
 	cfg *Config
 
-	peerList []*peer
-	stat     *statistic
+	peerList  []*peer
+	stat      *statistic
+	dropTable *dropTable
 
 	sleep time.Duration
 	delay time.Duration
@@ -39,8 +40,15 @@ func New(cfg *Config) (d *NTPd) {
 		cfg.RateSize = 1000
 	}
 
+	dt, err := newDropTable(cfg.DropCIDR)
+	if err != nil {
+		return
+	}
+
 	d = &NTPd{cfg: cfg,
-		template: newTemplate()}
+		template:  newTemplate(),
+		dropTable: dt,
+	}
 	if cfg.Metric != "" {
 		d.stat = newStatistic(cfg)
 	}

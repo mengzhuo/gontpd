@@ -71,6 +71,6 @@ drop_cidr:
 
 ## Performance
 ```
-KVM Intel(R) Xeon(R) CPU E5-2697 v4 @ 2.30GHz
-~60kpps per thread
+Intel(R) Core(TM) i7-4790 CPU @ 3.60GHz
+~180kpps @ GOMAXPROCS=1
 ```

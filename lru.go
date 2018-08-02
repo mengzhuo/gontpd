@@ -24,6 +24,7 @@ type entry struct {
 }
 
 func (u *lru) Add(ip net.IP, val int64) {
+
 	if ee, ok := u.cache[string(ip)]; ok {
 		u.ll.MoveToFront(ee)
 		ee.Value.(*entry).lastUnix = val
@@ -45,6 +46,7 @@ func (u *lru) RemoveOldest() {
 }
 
 func (u *lru) Get(ip net.IP) (val int64, ok bool) {
+
 	var ele *list.Element
 	if ele, ok = u.cache[string(ip)]; ok {
 		val = ele.Value.(*entry).lastUnix

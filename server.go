@@ -126,12 +126,11 @@ func (w *worker) Work() {
 		// BCE
 		_ = p[47]
 
-		if w.lru.maxEntry > 0 {
+		if w.d.cfg.RateSize > 0 {
+
 			lastUnix, ok = w.lru.Get(remoteAddr.IP)
+
 			if ok && receiveTime.Unix()-lastUnix < limit {
-				if debug {
-					log.Println(receiveTime.Unix()-lastUnix, ok)
-				}
 
 				if !w.d.cfg.RateDrop {
 					w.sendError(p, remoteAddr, rateKoD)

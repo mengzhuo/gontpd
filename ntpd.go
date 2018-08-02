@@ -36,8 +36,8 @@ func New(cfg *Config) (d *NTPd) {
 		cfg.MaxPoll = maxPoll
 	}
 
-	if cfg.RateSize <= 0 {
-		cfg.RateSize = 1000
+	if cfg.RateSize < 0 {
+		cfg.RateSize = 0
 	}
 
 	dt, err := newDropTable(cfg.DropCIDR)

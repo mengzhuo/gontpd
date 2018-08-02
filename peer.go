@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"log"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/beevik/ntp"
@@ -18,6 +19,7 @@ const (
 )
 
 type peer struct {
+	origin     string
 	addr       net.IP
 	reply      [replyNum]*ntp.Response
 	offset     time.Duration
@@ -30,9 +32,10 @@ type peer struct {
 	enable     bool
 }
 
-func newPeer(addr net.IP) (p *peer) {
-	log.Printf("new peer:%s", addr.String())
+func newPeer(origin string, addr net.IP) (p *peer) {
+	log.Printf("new peer:%s->%s", origin, addr.String())
 	p = &peer{
+		origin:     origin,
 		addr:       addr,
 		trustLevel: minPoll,
 		enable:     true,
@@ -41,8 +44,8 @@ func newPeer(addr net.IP) (p *peer) {
 	return
 }
 
-func (p *peer) update(maxstd time.Duration) {
-
+func (p *peer) update(wg *sync.WaitGroup, maxstd time.Duration) {
+	defer wg.Done()
 	p.good = false
 	ts := 2 * time.Second
 	goodList := []time.Duration{}

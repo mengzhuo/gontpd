@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/beevik/ntp"
@@ -19,7 +20,7 @@ type NTPd struct {
 	cfg *Config
 
 	peerList  []*peer
-	stat      *statistic
+	stat      *ntpStat
 	dropTable *dropTable
 
 	sleep time.Duration
@@ -50,7 +51,7 @@ func New(cfg *Config) (d *NTPd) {
 		dropTable: dt,
 	}
 	if cfg.Metric != "" {
-		d.stat = newStatistic(cfg)
+		d.stat = newNTPStat(cfg.Metric)
 	}
 	return d
 }
@@ -75,6 +76,7 @@ func (d *NTPd) Run() (err error) {
 		return
 	}
 	d.setTemplate(median)
+	d.updateState(median)
 
 	go d.listen()
 
@@ -134,24 +136,24 @@ func (d *NTPd) updateState(op *offsetPeer) {
 }
 
 func (d *NTPd) init() (err error) {
-	pool := map[string]net.IP{}
+	pool := map[string][]net.IP{}
 	for _, addr := range d.cfg.PeerList {
 		ips, err := net.LookupIP(addr)
 		if err != nil {
 			log.Print(err)
 			continue
 		}
-		for _, ip := range ips {
-			pool[ip.String()] = ip
-		}
+		pool[addr] = ips
 	}
 
-	for _, ip := range pool {
-		p := newPeer(ip)
-		if p == nil {
-			log.Printf("peer:%s init failed", ip.String())
+	for origin, ips := range pool {
+		for _, ip := range ips {
+			p := newPeer(origin, ip)
+			if p == nil {
+				log.Printf("peer:%s->%s init failed", origin, ip.String())
+			}
+			d.peerList = append(d.peerList, p)
 		}
-		d.peerList = append(d.peerList, p)
 	}
 
 	if len(d.peerList) == 0 {
@@ -165,11 +167,14 @@ func (d *NTPd) init() (err error) {
 }
 
 func (d *NTPd) poll() {
+	var wg sync.WaitGroup
 	for _, p := range d.peerList {
 		if p.enable {
-			p.update(d.cfg.MaxStd)
+			wg.Add(1)
+			go p.update(&wg, d.cfg.MaxStd)
 		}
 	}
+	wg.Wait()
 
 	goodCount := 0
 	for _, p := range d.peerList {

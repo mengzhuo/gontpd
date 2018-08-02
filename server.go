@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/rainycape/geoip"
 	"golang.org/x/sys/unix"
 )
 
@@ -16,6 +17,15 @@ const limit = 2
 
 func (d *NTPd) listen() {
 
+	var geodb *geoip.GeoIP
+	if d.cfg.GeoDB != "" {
+		var err error
+		geodb, err = geoip.Open(d.cfg.GeoDB)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+
 	for j := 0; j < d.cfg.ConnNum; j++ {
 		conn, err := d.makeConn()
 		if err != nil {
@@ -23,9 +33,15 @@ func (d *NTPd) listen() {
 		}
 		for i := 0; i < d.cfg.WorkerNum; i++ {
 			id := fmt.Sprintf("%d:%d", j, i)
+			var ws *workerStat
+			if d.cfg.Metric != "" {
+				ws = newWorkerStat(id)
+			}
+
 			w := worker{
 				id, newLRU(d.cfg.RateSize),
-				conn, d.stat, d,
+				conn, ws, d,
+				geodb,
 			}
 			go w.Work()
 		}
@@ -33,11 +49,12 @@ func (d *NTPd) listen() {
 }
 
 type worker struct {
-	id   string
-	lru  *lru
-	conn *net.UDPConn
-	stat *statistic
-	d    *NTPd
+	id    string
+	lru   *lru
+	conn  *net.UDPConn
+	stat  *workerStat
+	d     *NTPd
+	geoDB *geoip.GeoIP
 }
 
 func (d *NTPd) makeConn() (conn *net.UDPConn, err error) {
@@ -107,7 +124,7 @@ func (w *worker) Work() {
 					remoteAddr.String(), n)
 			}
 			if w.stat != nil {
-				w.stat.fastDropCounter.WithLabelValues("small_packet").Inc()
+				w.stat.Malform.Inc()
 			}
 			continue
 		}
@@ -118,7 +135,7 @@ func (w *worker) Work() {
 					remoteAddr.String(), n)
 			}
 			if w.stat != nil {
-				w.stat.fastDropCounter.WithLabelValues("acl_deny").Inc()
+				w.stat.ACL.Inc()
 			}
 			continue
 		}
@@ -136,7 +153,7 @@ func (w *worker) Work() {
 					w.sendError(p, remoteAddr, rateKoD)
 				}
 				if w.stat != nil {
-					w.stat.fastDropCounter.WithLabelValues("rate").Inc()
+					w.stat.Rate.Inc()
 				}
 				continue
 			}
@@ -156,17 +173,17 @@ func (w *worker) Work() {
 			copy(p[OriginTimeStamp:OriginTimeStamp+8],
 				p[TransmitTimeStamp:TransmitTimeStamp+8])
 			SetUint64(p, ReceiveTimeStamp, toNtpTime(receiveTime))
-
 			SetUint64(p, TransmitTimeStamp, toNtpTime(time.Now()))
 			_, err = w.conn.WriteToUDP(p, remoteAddr)
 			if err != nil && debug {
 				log.Printf("worker: %s write failed. %s", remoteAddr.String(), err)
 			}
-			if w.stat != nil {
-				w.stat.fastCounter.Inc()
-				if w.stat.geoDB != nil {
-					w.logIP(remoteAddr)
-				}
+			if w.stat == nil {
+				continue
+			}
+			w.stat.Req.Inc()
+			if w.stat.GeoDB != nil {
+				w.logIP(remoteAddr)
 			}
 		default:
 			if debug {
@@ -174,7 +191,7 @@ func (w *worker) Work() {
 					remoteAddr.String(), p[LiVnModePos]&^0xf8)
 			}
 			if w.stat != nil {
-				w.stat.fastDropCounter.WithLabelValues("unknown_mode").Inc()
+				w.stat.Unknown.Inc()
 			}
 		}
 	}
@@ -191,12 +208,12 @@ func (w *worker) sendError(p []byte, raddr *net.UDPAddr, err uint32) {
 }
 
 func (w *worker) logIP(raddr *net.UDPAddr) {
-	country, err := w.stat.geoDB.LookupIP(raddr.IP)
+	country, err := w.stat.GeoDB.LookupIP(raddr.IP)
 	if err != nil {
 		return
 	}
 	if country.Country == nil {
 		return
 	}
-	w.stat.reqCounter.WithLabelValues(country.Country.Code).Inc()
+	w.stat.CCReq.WithLabelValues(country.Country.Code).Inc()
 }

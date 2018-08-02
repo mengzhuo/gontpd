@@ -9,57 +9,83 @@ import (
 	"github.com/rainycape/geoip"
 )
 
-type statistic struct {
-	//stats
-	reqCounter      *prometheus.CounterVec
-	fastCounter     prometheus.Counter
-	fastDropCounter *prometheus.CounterVec
-	offsetGauge     prometheus.Gauge
-	dispGauge       prometheus.Gauge
-	delayGauge      prometheus.Gauge
-	pollGauge       prometheus.Gauge
-	driftGauge      prometheus.Gauge
-	geoDB           *geoip.GeoIP
+type workerStat struct {
+	CCReq   *prometheus.CounterVec
+	Req     prometheus.Counter
+	ACL     prometheus.Counter
+	Rate    prometheus.Counter
+	Malform prometheus.Counter
+	Unknown prometheus.Counter
+	GeoDB   *geoip.GeoIP
 }
 
-func newStatistic(cfg *Config) *statistic {
+func newWorkerStat(id string) (s *workerStat) {
 
-	var (
-		geoDB *geoip.GeoIP
-		err   error
-	)
-
-	if cfg.GeoDB != "" {
-		geoDB, err = geoip.Open(cfg.GeoDB)
-		if err != nil {
-			log.Fatal(err)
-			return nil
-		}
-	}
-
-	reqCounter := prometheus.NewCounterVec(prometheus.CounterOpts{
+	s = &workerStat{}
+	s.CCReq = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "ntp",
 		Subsystem: "requests",
 		Name:      "total",
 		Help:      "The total number of ntp request",
 	}, []string{"cc"})
-	prometheus.MustRegister(reqCounter)
+	prometheus.MustRegister(s.CCReq)
 
-	fastCounter := prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: "ntp",
-		Subsystem: "requests",
-		Name:      "fasttotal",
-		Help:      "The total number of ntp request",
+	s.Req = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace:   "ntp",
+		Subsystem:   "requests",
+		Name:        "fasttotal",
+		Help:        "The total number of ntp request",
+		ConstLabels: prometheus.Labels{"id": id},
 	})
-	prometheus.MustRegister(fastCounter)
+	prometheus.MustRegister(s.Req)
 
-	fastDropCounter := prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "ntp",
-		Subsystem: "requests",
-		Name:      "fastdrop",
-		Help:      "The total dropped ntp request",
-	}, []string{"reason"})
-	prometheus.MustRegister(fastDropCounter)
+	s.ACL = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace:   "ntp",
+		Subsystem:   "requests",
+		Name:        "drop",
+		Help:        "The total dropped ntp request",
+		ConstLabels: prometheus.Labels{"id": id, "reason": "acl"},
+	})
+	prometheus.MustRegister(s.ACL)
+
+	s.Rate = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace:   "ntp",
+		Subsystem:   "requests",
+		Name:        "drop",
+		Help:        "The total dropped ntp request",
+		ConstLabels: prometheus.Labels{"id": id, "reason": "rate"},
+	})
+	prometheus.MustRegister(s.Rate)
+
+	s.Malform = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace:   "ntp",
+		Subsystem:   "requests",
+		Name:        "drop",
+		Help:        "The total dropped ntp request",
+		ConstLabels: prometheus.Labels{"id": id, "reason": "malform"},
+	})
+	prometheus.MustRegister(s.Malform)
+
+	s.Unknown = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace:   "ntp",
+		Subsystem:   "requests",
+		Name:        "drop",
+		Help:        "The total dropped ntp request",
+		ConstLabels: prometheus.Labels{"id": id, "reason": "unknown_method"},
+	})
+	prometheus.MustRegister(s.Unknown)
+	return
+}
+
+type ntpStat struct {
+	offsetGauge prometheus.Gauge
+	dispGauge   prometheus.Gauge
+	delayGauge  prometheus.Gauge
+	pollGauge   prometheus.Gauge
+	driftGauge  prometheus.Gauge
+}
+
+func newNTPStat(listen string) *ntpStat {
 
 	offsetGauge := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "ntp",
@@ -94,17 +120,13 @@ func newStatistic(cfg *Config) *statistic {
 	prometheus.MustRegister(pollGauge)
 
 	http.Handle("/metrics", promhttp.Handler())
-	log.Printf("Listen metric: %s", cfg.Metric)
-	go http.ListenAndServe(cfg.Metric, nil)
+	log.Printf("Listen metric: %s", listen)
+	go http.ListenAndServe(listen, nil)
 
-	return &statistic{
-		reqCounter:      reqCounter,
-		fastCounter:     fastCounter,
-		fastDropCounter: fastDropCounter,
-		offsetGauge:     offsetGauge,
-		dispGauge:       dispGauge,
-		delayGauge:      delayGauge,
-		pollGauge:       pollGauge,
-		geoDB:           geoDB,
+	return &ntpStat{
+		offsetGauge: offsetGauge,
+		dispGauge:   dispGauge,
+		delayGauge:  delayGauge,
+		pollGauge:   pollGauge,
 	}
 }

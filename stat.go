@@ -23,10 +23,11 @@ func newWorkerStat(id string) (s *workerStat) {
 
 	s = &workerStat{}
 	s.CCReq = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "ntp",
-		Subsystem: "requests",
-		Name:      "total",
-		Help:      "The total number of ntp request",
+		Namespace:   "ntp",
+		Subsystem:   "requests",
+		Name:        "total",
+		Help:        "The total number of ntp request",
+		ConstLabels: prometheus.Labels{"id": id},
 	}, []string{"cc"})
 	prometheus.MustRegister(s.CCReq)
 

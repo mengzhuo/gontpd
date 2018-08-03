@@ -1,1 +1,3 @@
+name: GoNPTd
+description: High Performance NTP daemon written in Go
 theme: jekyll-theme-slate

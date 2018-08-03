@@ -71,6 +71,14 @@ drop_cidr:
 
 ```
 
+## Operation
+
+iptables
+```
+-A PREROUTING -p udp -m udp --dport 123 -j NOTRACK
+-A OUTPUT -p udp -m udp --sport 123 -j NOTRACK
+```
+
 ## Performance
 ```
 Intel(R) Core(TM) i7-4790 CPU @ 3.60GHz

@@ -1,6 +1,6 @@
 # gontpd
 
-A high performance sntp daemon focus on stratum > 2 serving
+A high performance NTP daemon written in Go.
 
 Only support Linux
 
@@ -15,7 +15,7 @@ or
 
 ## run
 ```
-gontpd -c config.yml -f 0
+gontpd -c config.yml
 ```
 
 ## config

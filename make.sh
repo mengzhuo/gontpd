@@ -16,4 +16,11 @@ $MAKEGOBIN build \
     cmd/gontpd/main.go
 
 fpm -s dir -C '.buildtmp/' -t deb -n gontpd -v $VERSION --verbose --url https://gontpd.org\
-    --post-install .post-install.sh
+    --license MIT\
+    --conflicts ntp\
+    --conflicts chrony\
+    --deb-compression xz\
+    -m "Meng Zhuo<mengzhuo1203@gmail.com>"\
+    --vendor "Meng Zhuo<mengzhuo1203@gmail.com>"\
+    --post-install .post-install.sh\
+    --description "High performance NTP daemon"

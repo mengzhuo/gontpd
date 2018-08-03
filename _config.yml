@@ -1,3 +1,5 @@
+title: GoNTPd
 name: High Performance NTP daemon written in Go
 description: High Performance NTP daemon written in Go
 theme: jekyll-theme-cayman
+show_downloads: true

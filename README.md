@@ -1,5 +1,6 @@
 # GoNTPd
 [![GoDoc](https://godoc.org/github.com/mengzhuo/gontpd?status.svg)](https://godoc.org/github.com/mengzhuo/gontpd)
+[![Build Status](https://travis-ci.org/mengzhuo/gontpd.svg?branch=master)](https://travis-ci.org/mengzhuo/gontpd)
 
 A high performance NTP daemon written in Go.
 

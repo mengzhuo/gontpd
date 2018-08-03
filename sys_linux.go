@@ -14,10 +14,10 @@ const (
 )
 
 const (
-	NoLeap uint8 = iota
-	LeapIns
-	LeapDel
-	NotSync
+	noLeap uint8 = iota
+	leapIns
+	leapDel
+	notSync
 )
 
 var (
@@ -80,9 +80,9 @@ func syncClock(d time.Duration, leap uint8, force bool) (err error) {
 	}
 
 	switch leap {
-	case LeapIns:
+	case leapIns:
 		tmx.Status |= staINS
-	case LeapDel:
+	case leapDel:
 		tmx.Status |= staDEL
 	}
 	var rc int

@@ -37,34 +37,34 @@ const (
 )
 
 const (
-	ModeReserved uint8 = iota
-	ModeSymmetricActive
-	ModeSymmetricPassive
-	ModeClient
-	ModeServer
-	ModeBroadcast
-	ModeControlMessage
-	ModeReservedPrivate
+	modeReserved uint8 = iota
+	modeSymmetricActive
+	modeSymmetricPassive
+	modeClient
+	modeServer
+	modeBroadcast
+	modeControlMessage
+	modeReservedPrivate
 )
 
 const (
-	LiVnModePos = iota
-	StratumPos
-	PollPos
-	ClockPrecisionPos
+	liVnModePos = iota
+	stratumPos
+	pollPos
+	clockPrecisionPos
 )
 
 const (
-	RootDelayPos = iota*4 + 4
-	RootDispersionPos
-	ReferIDPos
+	rootDelayPos = iota*4 + 4
+	rootDispersionPos
+	referIDPos
 )
 
 const (
-	ReferenceTimeStamp = iota*8 + 16
-	OriginTimeStamp
-	ReceiveTimeStamp
-	TransmitTimeStamp
+	referenceTimeStamp = iota*8 + 16
+	originTimeStamp
+	receiveTimeStamp
+	transmitTimeStamp
 )
 
 var ntpEpoch = time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -76,36 +76,36 @@ func toNtpTime(t time.Time) uint64 {
 	return uint64(sec<<32 | frac)
 }
 
-func SetLi(m []byte, li uint8) {
+func setLi(m []byte, li uint8) {
 	m[0] = (m[0] & 0x3f) | li<<6
 }
 
-func SetMode(m []byte, mode uint8) {
+func setMode(m []byte, mode uint8) {
 	m[0] = (m[0] & 0xf8) | mode
 }
 
-func GetMode(m []byte) uint8 {
+func getMode(m []byte) uint8 {
 	return m[0] &^ 0xf8
 }
 
-func SetVersion(m []byte, v uint8) {
+func setVersion(m []byte, v uint8) {
 	m[0] = (m[0] & 0xc7) | v<<3
 }
 
-func SetUint64(m []byte, index int, value uint64) {
+func setUint64(m []byte, index int, value uint64) {
 	binary.BigEndian.PutUint64(m[index:], value)
 }
 
-func SetUint8(m []byte, index int, value uint8) {
+func setUint8(m []byte, index int, value uint8) {
 	m[index] = value
 }
 
-func SetInt8(m []byte, index int, value int8) {
+func setInt8(m []byte, index int, value int8) {
 	// bigEndian
 	m[index] = byte(value)
 }
 
-func SetUint32(m []byte, index int, value uint32) {
+func setUint32(m []byte, index int, value uint32) {
 	binary.BigEndian.PutUint32(m[index:], value)
 }
 
@@ -117,34 +117,34 @@ func toNtpShortTime(t time.Duration) uint32 {
 
 func newTemplate() (t []byte) {
 	t = make([]byte, 48)
-	SetLi(t, NoLeap)
-	SetVersion(t, 4)
-	SetMode(t, ModeServer)
-	SetUint32(t, ReferIDPos, initRefer)
-	SetInt8(t, PollPos, minPoll)
-	SetUint8(t, StratumPos, 0xff)
-	SetUint64(t, ReferenceTimeStamp, toNtpTime(time.Now()))
+	setLi(t, noLeap)
+	setVersion(t, 4)
+	setMode(t, modeServer)
+	setUint32(t, referIDPos, initRefer)
+	setInt8(t, pollPos, minPoll)
+	setUint8(t, stratumPos, 0xff)
+	setUint64(t, referenceTimeStamp, toNtpTime(time.Now()))
 	return
 }
 
 func (d *NTPd) setTemplate(op *offsetPeer) {
 
-	SetLi(d.template, uint8(op.resp.Leap))
-	SetMode(d.template, ModeServer)
+	setLi(d.template, uint8(op.resp.Leap))
+	setMode(d.template, modeServer)
 
-	SetUint8(d.template, StratumPos, op.resp.Stratum+1)
-	SetInt8(d.template, ClockPrecisionPos, systemPrecision())
+	setUint8(d.template, stratumPos, op.resp.Stratum+1)
+	setInt8(d.template, clockPrecisionPos, systemPrecision())
 
 	d.delay = op.resp.RootDelay + op.resp.RTT/2
-	SetUint32(d.template, RootDelayPos, toNtpShortTime(d.delay))
+	setUint32(d.template, rootDelayPos, toNtpShortTime(d.delay))
 
 	d.disp = op.resp.RootDelay/2 + op.resp.RootDispersion
-	SetUint32(d.template, RootDispersionPos,
+	setUint32(d.template, rootDispersionPos,
 		toNtpShortTime(d.disp))
-	SetUint64(d.template, ReferenceTimeStamp, toNtpTime(op.resp.Time))
-	SetUint32(d.template, ReferIDPos, op.peer.refId)
+	setUint64(d.template, referenceTimeStamp, toNtpTime(op.resp.Time))
+	setUint32(d.template, referIDPos, op.peer.refId)
 
-	SetInt8(d.template, PollPos, int8(op.peer.trustLevel))
+	setInt8(d.template, pollPos, int8(op.peer.trustLevel))
 }
 
 func stddev(pl []time.Duration) time.Duration {

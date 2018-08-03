@@ -163,17 +163,17 @@ func (w *worker) Work() {
 
 		// GetMode
 
-		switch p[LiVnModePos] &^ 0xf8 {
-		case ModeSymmetricActive:
+		switch p[liVnModePos] &^ 0xf8 {
+		case modeSymmetricActive:
 			w.sendError(p, remoteAddr, acstKoD)
-		case ModeReserved:
+		case modeReserved:
 			fallthrough
-		case ModeClient:
-			copy(p[0:OriginTimeStamp], w.d.template)
-			copy(p[OriginTimeStamp:OriginTimeStamp+8],
-				p[TransmitTimeStamp:TransmitTimeStamp+8])
-			SetUint64(p, ReceiveTimeStamp, toNtpTime(receiveTime))
-			SetUint64(p, TransmitTimeStamp, toNtpTime(time.Now()))
+		case modeClient:
+			copy(p[0:originTimeStamp], w.d.template)
+			copy(p[originTimeStamp:originTimeStamp+8],
+				p[transmitTimeStamp:transmitTimeStamp+8])
+			setUint64(p, receiveTimeStamp, toNtpTime(receiveTime))
+			setUint64(p, transmitTimeStamp, toNtpTime(time.Now()))
 			_, err = w.conn.WriteToUDP(p, remoteAddr)
 			if err != nil && debug {
 				log.Printf("worker: %s write failed. %s", remoteAddr.String(), err)
@@ -188,7 +188,7 @@ func (w *worker) Work() {
 		default:
 			if debug {
 				log.Printf("%s not support client request mode:%x",
-					remoteAddr.String(), p[LiVnModePos]&^0xf8)
+					remoteAddr.String(), p[liVnModePos]&^0xf8)
 			}
 			if w.stat != nil {
 				w.stat.Unknown.Inc()
@@ -199,11 +199,11 @@ func (w *worker) Work() {
 
 func (w *worker) sendError(p []byte, raddr *net.UDPAddr, err uint32) {
 	// avoid spoof
-	copy(p[0:OriginTimeStamp], w.d.template)
-	copy(p[OriginTimeStamp:OriginTimeStamp+8],
-		p[TransmitTimeStamp:TransmitTimeStamp+8])
-	SetUint8(p, StratumPos, 0)
-	SetUint32(p, ReferIDPos, err)
+	copy(p[0:originTimeStamp], w.d.template)
+	copy(p[originTimeStamp:originTimeStamp+8],
+		p[transmitTimeStamp:transmitTimeStamp+8])
+	setUint8(p, stratumPos, 0)
+	setUint32(p, referIDPos, err)
 	w.conn.WriteToUDP(p, raddr)
 }
 

@@ -6,21 +6,24 @@ A high performance NTP daemon written in Go.
 
 Only support Linux
 
-## install
+## Install or Build
+
 ```
+# require go1.11
 go get github.com/mengzhuo/gontpd/cmd/gontpd
 ```
 or
 ```
-./make.sh # to build debian package
+# require fpm
+./make.sh #  build debian package your
 ```
 
-## run
+## Run
 ```
 gontpd -c config.yml
 ```
 
-## config
+## Config
 ```
 # listen: gontpd service listen port (UDP)
 listen: ':123'
@@ -75,8 +78,15 @@ drop_cidr:
 
 iptables
 ```
--A PREROUTING -p udp -m udp --dport 123 -j NOTRACK
--A OUTPUT -p udp -m udp --sport 123 -j NOTRACK
+-t raw -A PREROUTING -p udp -m udp --dport 123 -j NOTRACK
+-t raw -A OUTPUT -p udp -m udp --sport 123 -j NOTRACK
+```
+sysctl
+```
+net.core.rmem_default = 512992
+net.core.rmem_max = 512992
+net.core.wmem_default = 512992
+net.core.wmem_max = 512992
 ```
 
 ## Performance

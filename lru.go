@@ -10,11 +10,11 @@ type lru struct {
 	cache    map[string]*list.Element
 	ll       *list.List
 	maxEntry int
-	pool     sync.Pool
+	pool     *sync.Pool
 }
 
 func newLRU(s int) *lru {
-	pool := sync.Pool{
+	pool := &sync.Pool{
 		New: func() interface{} {
 			return &entry{}
 		}}

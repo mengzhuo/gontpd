@@ -70,6 +70,12 @@ func (d *NTPd) makeConn() (conn *net.UDPConn, err error) {
 			if operr != nil {
 				return
 			}
+			rerr := syscall.SetsockoptInt(int(fd),
+				syscall.SOL_SOCKET,
+				unix.SO_ATTACH_REUSEPORT_EBPF, 1)
+			if rerr != nil {
+				log.Println(rerr, "but continue...")
+			}
 		}
 
 		if err = conn.Control(fn); err != nil {

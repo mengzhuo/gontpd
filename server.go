@@ -74,7 +74,7 @@ func (d *NTPd) makeConn() (conn *net.UDPConn, err error) {
 				syscall.SOL_SOCKET,
 				unix.SO_ATTACH_REUSEPORT_EBPF, 1)
 			if rerr != nil {
-				log.Println(rerr, "but continue...")
+				log.Println("set attach reuseport failed:", rerr, "but continue...")
 			}
 		}
 
@@ -107,13 +107,15 @@ func (w *worker) Work() {
 	p := make([]byte, 48)
 	oob := make([]byte, 1)
 
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("Worker: %s fatal, reason:%s, read:%d", w.id, r, n)
-		} else {
-			log.Printf("Worker: %s exited, reason:%s, read:%d", w.id, err, n)
-		}
-	}()
+	/*
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Worker: %s fatal, reason:%s, read:%d", w.id, r, n)
+			} else {
+				log.Printf("Worker: %s exited, reason:%s, read:%d", w.id, err, n)
+			}
+		}()
+	*/
 
 	log.Printf("worker %s started", w.id)
 

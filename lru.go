@@ -82,6 +82,8 @@ func (u *lru) insertHead(e *entry) {
 func (u *lru) Get(ip net.IP) (val int64, ok bool) {
 	var e *entry
 	e, ok = u.cache[string(ip)]
-	val = e.lastUnix
+	if ok {
+		val = e.lastUnix
+	}
 	return
 }

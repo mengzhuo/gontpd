@@ -1,66 +1,87 @@
 package gontpd
 
 import (
-	"container/list"
 	"net"
-	"sync"
 )
 
 type lru struct {
-	cache    map[string]*list.Element
-	ll       *list.List
+	cache    map[string]*entry
+	root     *entry
 	maxEntry int
-	pool     *sync.Pool
+	len      int
 }
 
 func newLRU(s int) *lru {
-	pool := &sync.Pool{
-		New: func() interface{} {
-			return &entry{}
-		}}
+
+	root := &entry{prev: nil, next: nil}
+	root.next = root
+	root.prev = root
+
 	return &lru{
-		map[string]*list.Element{},
-		list.New(),
-		s, pool,
+		make(map[string]*entry, s),
+		root,
+		s, 0,
 	}
 }
 
 type entry struct {
-	key      net.IP
-	lastUnix int64
+	key        net.IP
+	lastUnix   int64
+	prev, next *entry
 }
 
 func (u *lru) Add(ip net.IP, val int64) {
 
-	if ee, ok := u.cache[string(ip)]; ok {
-		u.ll.MoveToFront(ee)
-		ee.Value.(*entry).lastUnix = val
+	var (
+		e  *entry
+		ok bool
+	)
+
+	if e, ok = u.cache[string(ip)]; ok {
+		// move to front
+		e.lastUnix = val
+
+		if u.root.next == e {
+			return
+		}
+		// unlink target
+		prev := e.prev
+		next := e.next
+		prev.next = next
+		next.prev = prev
+
+		u.insertHead(e)
 		return
 	}
 
-	e := u.pool.Get().(*entry)
-	e.key = ip
-	e.lastUnix = val
-	ele := u.ll.PushFront(e)
-	u.cache[string(ip)] = ele
-	if u.maxEntry < u.ll.Len() {
-		u.RemoveOldest()
+	if u.len >= u.maxEntry {
+		// remove tail
+		e = u.root.prev
+		delete(u.cache, string(e.key))
+
+		u.root.prev = e.prev
+		e.key = ip
+		e.lastUnix = val
+		u.len--
+	} else {
+		// not enough
+		e = &entry{key: ip, lastUnix: val}
 	}
+	u.insertHead(e)
+	u.cache[string(ip)] = e
+	u.len++
 }
 
-func (u *lru) RemoveOldest() {
-	ele := u.ll.Back()
-	ee := ele.Value.(*entry)
-	delete(u.cache, string(ee.key))
-	u.ll.Remove(ele)
-	u.pool.Put(ee)
+func (u *lru) insertHead(e *entry) {
+	originHead := u.root.next
+	u.root.next = e
+	originHead.prev = e
+	e.next = originHead
 }
 
 func (u *lru) Get(ip net.IP) (val int64, ok bool) {
-
-	var ele *list.Element
-	if ele, ok = u.cache[string(ip)]; ok {
-		val = ele.Value.(*entry).lastUnix
-	}
+	var e *entry
+	e, ok = u.cache[string(ip)]
+	val = e.lastUnix
 	return
 }

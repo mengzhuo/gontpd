@@ -107,13 +107,13 @@ func (w *worker) Work() {
 		n        int
 		ok       bool
 	)
-	p := make([]byte, 48)
+	var p [48]byte
 	oob := make([]byte, 1)
 
 	log.Printf("worker %s started", w.id)
 
 	for {
-		n, _, _, remoteAddr, err = w.conn.ReadMsgUDP(p, oob)
+		n, _, _, remoteAddr, err = w.conn.ReadMsgUDP(p[:], oob)
 		if err != nil {
 			return
 		}
@@ -141,9 +141,6 @@ func (w *worker) Work() {
 			continue
 		}
 
-		// BCE
-		_ = p[47]
-
 		if w.d.cfg.RateSize > 0 {
 
 			lastUnix, ok = w.lru.Get(remoteAddr.IP)
@@ -151,7 +148,7 @@ func (w *worker) Work() {
 			if ok && receiveTime.Unix()-lastUnix < limit {
 
 				if !w.d.cfg.RateDrop {
-					w.sendError(p, remoteAddr, rateKoD)
+					w.sendError(p[:], remoteAddr, rateKoD)
 				}
 				if w.stat != nil {
 					w.stat.Rate.Inc()
@@ -166,16 +163,16 @@ func (w *worker) Work() {
 
 		switch p[liVnModePos] &^ 0xf8 {
 		case modeSymmetricActive:
-			w.sendError(p, remoteAddr, acstKoD)
+			w.sendError(p[:], remoteAddr, acstKoD)
 		case modeReserved:
 			fallthrough
 		case modeClient:
 			copy(p[0:originTimeStamp], w.d.template)
 			copy(p[originTimeStamp:originTimeStamp+8],
 				p[transmitTimeStamp:transmitTimeStamp+8])
-			setUint64(p, receiveTimeStamp, toNtpTime(receiveTime))
-			setUint64(p, transmitTimeStamp, toNtpTime(time.Now()))
-			_, err = w.conn.WriteToUDP(p, remoteAddr)
+			setUint64(p[:], receiveTimeStamp, toNtpTime(receiveTime))
+			setUint64(p[:], transmitTimeStamp, toNtpTime(time.Now()))
+			_, err = w.conn.WriteToUDP(p[:], remoteAddr)
 			if err != nil && debug {
 				log.Printf("worker: %s write failed. %s", remoteAddr.String(), err)
 			}

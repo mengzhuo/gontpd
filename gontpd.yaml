@@ -1,4 +1,3 @@
-forceupdate: true
 listen: ':123'
 workernum: 2
 connnum: 1

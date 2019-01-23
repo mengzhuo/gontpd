@@ -3,7 +3,6 @@ package gontpd
 import (
 	"errors"
 	"log"
-	"math"
 	"strings"
 	"syscall"
 	"time"
@@ -14,6 +13,8 @@ const (
 )
 
 const (
+	debug = false
+
 	noLeap uint8 = iota
 	leapIns
 	leapDel
@@ -223,9 +224,11 @@ func statusToString(s int32) (status string) {
 	return strings.Join(buf, ", ")
 }
 
+/*
 func systemPrecision() int8 {
 	tmx := &syscall.Timex{}
 	syscall.Adjtimex(tmx)
 	// linux 1 for usec
 	return int8(math.Log2(float64(tmx.Precision) * 1e-6))
 }
+*/

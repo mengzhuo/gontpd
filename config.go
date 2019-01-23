@@ -1,22 +1,39 @@
 package gontpd
 
-import "time"
+import (
+	"fmt"
+	"io/ioutil"
+
+	yaml "gopkg.in/yaml.v2"
+)
 
 type Config struct {
-	MaxStd time.Duration `yaml:"max_std"`
-
-	DropCIDR  []string `yaml:"drop_cidr"`
-	PeerList  []string `yaml:"peer_list"`
-	GeoDB     string   `yaml:"geo_db"`
-	Metric    string   `yaml:"metric"`
 	Listen    string   `yaml:"listen"`
-	WorkerNum int      `yaml:"worker_num"`
-	ConnNum   int      `yaml:"conn_num"`
-	RateSize  int      `yaml:"rate_size"`
+	Workernum uint     `yaml:"workernum"`
+	Connnum   uint     `yaml:"connnum"`
+	Metric    string   `yaml:"metric"`
+	Peerlist  []string `yaml:"peerlist"`
+}
 
-	RateDrop    bool `yaml:"rate_drop"`
-	ForceUpdate bool `yaml:"force_update"`
+func NewConfig(p string) (cfg *Config, err error) {
+	var data []byte
+	cfg = &Config{}
+	data, err = ioutil.ReadFile(p)
+	if err != nil {
+		return
+	}
+	err = yaml.Unmarshal(data, cfg)
+	if err != nil {
+		return
+	}
 
-	MaxPoll uint8 `yaml:"max_poll"`
-	MinPoll uint8 `yaml:"min_poll"`
+	if cfg.Listen == "" {
+		err = fmt.Errorf("listen is empty")
+		return
+	}
+
+	if len(cfg.Peerlist) < 1 {
+		err = fmt.Errorf("peer list is empty")
+	}
+	return
 }

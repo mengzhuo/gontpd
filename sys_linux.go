@@ -65,10 +65,10 @@ func syncClock(d time.Duration, leap uint8, force bool) (err error) {
 			log.Printf("set offset slew offset=%s const=%d", d, con)
 		}
 		tmx.Modes = adjNANO | adjOFFSET | adjMAXERROR | adjESTERROR | adjTIMECONST
-		tmx.Offset = offsetNsec
+		tmx.Offset = int32(offsetNsec)
 		tmx.Maxerror = 0
 		tmx.Esterror = 0
-		tmx.Constant = con
+		tmx.Constant = int32(con)
 	} else {
 		if force {
 			if debug {

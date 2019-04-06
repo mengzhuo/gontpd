@@ -48,8 +48,10 @@ acl:
 
 iptables
 ```
--t raw -A PREROUTING -p udp -m udp --dport 123 -j NOTRACK
--t raw -A OUTPUT -p udp -m udp --sport 123 -j NOTRACK
+-A PREROUTING -p udp -m udp --dport 123 -j NOTRACK
+-A PREROUTING -p udp -m udp --dport 123 -j NOTRACK
+-A OUTPUT -p udp -m udp --sport 123 -j NOTRACK
+-A OUTPUT -p udp -m udp --sport 123 -j NOTRACK
 ```
 sysctl
 ```

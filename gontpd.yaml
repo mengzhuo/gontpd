@@ -1,4 +1,8 @@
 listen: ':123'
 workernum: 2
 metric: ':7370'
-up_state: time.asia.apple.com:123
+up_state: 127.0.0.1:123
+acl:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16

@@ -15,7 +15,7 @@ type Config struct {
 	Metric    string   `yaml:"metric"`
 	UpState   string   `yaml:"up_state"`
 	ACL       []string `yaml:"acl"`
-	rACL      []net.IPMask
+	rACL      []*net.IPNet
 }
 
 func NewConfig(p string) (cfg *Config, err error) {
@@ -38,9 +38,22 @@ func NewConfig(p string) (cfg *Config, err error) {
 	if cfg.UpState == "" {
 		err = fmt.Errorf("peer list is empty")
 	}
+	for _, c := range cfg.ACL {
+		var n *net.IPNet
+		_, n, err = net.ParseCIDR(c)
+		if err != nil {
+			return
+		}
+		cfg.rACL = append(cfg.rACL, n)
+	}
 	return
 }
 
 func (c *Config) InACL(ip net.IP) bool {
+	for _, n := range c.rACL {
+		if n.Contains(ip) {
+			return true
+		}
+	}
 	return false
 }

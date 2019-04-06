@@ -31,23 +31,15 @@ listen: ':123'
 # worker_num: goroutines per connection
 worker_num: 1
 
-# conn_num: numbers of connections
-conn_num: 1
-
-# rate: LRU size of rate limmiter
-# if drop is true, limmiter will drop the client request instead of sending RATE KoD response to client.
-rate_size: 8196
-rate_drop: true
-
 # metric: prometheus stat listen port
 metric: ':7370'
 
 # peer_list: upstream peer list that sync to
-up_state: 127.0.0.1
+up_state: 127.0.0.1:123
 
-# drop_cidr: remote address within this list will be drop
+# acl: remote address within this list will be drop
 # suggest to drop private net request(mostly are spoof request)
-drop_cidr:
+acl:
     - "192.168.0.0/16"
     - "172.16.0.0/12"
     - "10.0.0.0/8"

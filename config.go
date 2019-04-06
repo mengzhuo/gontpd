@@ -10,8 +10,7 @@ import (
 
 type Config struct {
 	Listen    string   `yaml:"listen"`
-	Workernum uint     `yaml:"workernum"`
-	Connnum   uint     `yaml:"connnum"`
+	Workernum uint     `yaml:"worker_num"`
 	Metric    string   `yaml:"metric"`
 	UpState   string   `yaml:"up_state"`
 	ACL       []string `yaml:"acl"`

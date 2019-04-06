@@ -1,5 +1,5 @@
 listen: ':123'
-workernum: 2
+worker_num: 2
 metric: ':7370'
 up_state: 127.0.0.1:123
 acl:

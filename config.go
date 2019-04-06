@@ -8,11 +8,11 @@ import (
 )
 
 type Config struct {
-	Listen    string   `yaml:"listen"`
-	Workernum uint     `yaml:"workernum"`
-	Connnum   uint     `yaml:"connnum"`
-	Metric    string   `yaml:"metric"`
-	Peerlist  []string `yaml:"peerlist"`
+	Listen    string `yaml:"listen"`
+	Workernum uint   `yaml:"workernum"`
+	Connnum   uint   `yaml:"connnum"`
+	Metric    string `yaml:"metric"`
+	UpState   string `yaml:"up_state"`
 }
 
 func NewConfig(p string) (cfg *Config, err error) {
@@ -32,7 +32,7 @@ func NewConfig(p string) (cfg *Config, err error) {
 		return
 	}
 
-	if len(cfg.Peerlist) < 1 {
+	if cfg.UpState == "" {
 		err = fmt.Errorf("peer list is empty")
 	}
 	return

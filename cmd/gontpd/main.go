@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -26,7 +25,7 @@ func main() {
 	flag.Parse()
 
 	if *fv {
-		fmt.Println(Version)
+		flag.PrintDefaults()
 		return
 	}
 
@@ -51,6 +50,9 @@ func main() {
 	}
 
 	log.Printf("%+v", cfg)
-	d := gontpd.New(cfg)
-	log.Fatal(d.Run())
+	d, err := gontpd.New(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	d.Run()
 }

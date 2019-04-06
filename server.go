@@ -62,10 +62,12 @@ func (svr *Server) followUpState() (err error) {
 	n, _, err := conn.ReadFrom(msg)
 	if n < 48 || err != nil {
 		err = fmt.Errorf("invalid upstream state:%s", err)
+		return
 	}
 	if !bytes.Equal(msg[originTimeStamp:originTimeStamp+8], cookie) {
 		err = fmt.Errorf("mismatch %x vs %x", cookie,
 			msg[originTimeStamp:originTimeStamp+8])
+		return
 	}
 	if msg[2] == 0 {
 		msg[2] = 0x8

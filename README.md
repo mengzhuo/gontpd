@@ -4,9 +4,9 @@ PET PROJECT WARNING: NOT PRODUCTION READY NO TESTES YET
 [![GoDoc](https://godoc.org/github.com/mengzhuo/gontpd?status.svg)](https://godoc.org/github.com/mengzhuo/gontpd)
 [![Build Status](https://travis-ci.org/mengzhuo/gontpd.svg?branch=master)](https://travis-ci.org/mengzhuo/gontpd)
 
-A high performance NTP daemon written in Go.
-
-Only support Linux
+gontpd is an experimental high-performance NTP server written in Go. 
+It does not implement a full NTP client and relies on another NTP client and server to be running on the system instead. It periodically updates its state to mirror the real NTP client/server and uses multiple threads to serve the current system time.
+Inspired by [rsntp](https://github.com/mlichvar/rsntp)
 
 ## Install or Build
 
@@ -30,45 +30,18 @@ gontpd -c config.yml
 # listen: gontpd service listen port (UDP)
 listen: ':123'
 
-# force_update: force update time if offset is over 128ms or terminal processs
-force_update: true
-
 # worker_num: goroutines per connection
 worker_num: 1
-
-# conn_num: numbers of connections
-conn_num: 1
-
-# rate: LRU size of rate limmiter
-# if drop is true, limmiter will drop the client request instead of sending RATE KoD response to client.
-rate_size: 8196
-rate_drop: true
 
 # metric: prometheus stat listen port
 metric: ':7370'
 
-# geo_db: MaxMind GeoLite2 DB path, it won't stat CountryCode is empty
-# NOTE: This will cause high CPU usage, use with caution
-geo_db: 
-
-# max/min poll interval seconds (log2) to upstream peer
-# i.e. 10 = 1024 seconds
-max_poll: 9
-min_poll: 4
-
 # peer_list: upstream peer list that sync to
-peer_list:
-    - time1.apple.com
-    - time2.apple.com
-    - time3.apple.com
-    - time4.apple.com
+up_state: 127.0.0.1:123
 
-# max_std: maximum standard deviation of peer that we consider as a good peer.
-max_std: 50ms
-
-# drop_cidr: remote address within this list will be drop
+# acl: remote address within this list will be drop
 # suggest to drop private net request(mostly are spoof request)
-drop_cidr:
+acl:
     - "192.168.0.0/16"
     - "172.16.0.0/12"
     - "10.0.0.0/8"

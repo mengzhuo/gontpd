@@ -1,12 +1,8 @@
-forceupdate: true
 listen: ':123'
-workernum: 2
-connnum: 1
+worker_num: 2
 metric: ':7370'
-geodb: GeoLite2-Country.mmdb
-maxpoll: 8
-minpoll: 4
-peerlist:
-    - time1.apple.com
-    - time2.apple.com
-    - time3.apple.com
+up_state: 127.0.0.1:1123
+acl:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16

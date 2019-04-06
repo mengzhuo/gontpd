@@ -7,6 +7,8 @@ import (
 	"log"
 	"net"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -99,6 +101,27 @@ func (s *Server) Run() {
 			conn:  s.conn,
 			cfg:   s.cfg,
 			state: s.state}
+
+		if s.cfg.Metric != "" {
+			s := &counter{}
+			s.total = prometheus.NewCounter(prometheus.CounterOpts{
+				Namespace:   "ntp",
+				Subsystem:   "requests",
+				Name:        "total",
+				Help:        "The total number of ntp request",
+				ConstLabels: prometheus.Labels{"id": fmt.Sprintf("%d", i)}})
+			prometheus.MustRegister(s.total)
+
+			s.drop = prometheus.NewCounterVec(prometheus.CounterOpts{
+				Namespace:   "ntp",
+				Subsystem:   "requests",
+				Name:        "drop",
+				Help:        "The total dropped ntp request",
+				ConstLabels: prometheus.Labels{"id": fmt.Sprintf("%d", i)},
+			}, []string{"reason"})
+			prometheus.MustRegister(s.drop)
+			worker.counter = s
+		}
 		go worker.run(i)
 		s.worker = append(s.worker, worker)
 	}

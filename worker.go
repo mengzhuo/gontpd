@@ -5,12 +5,20 @@ import (
 	"log"
 	"net"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type Worker struct {
-	conn  *net.UDPConn
-	cfg   *Config
-	state []byte
+	conn    *net.UDPConn
+	cfg     *Config
+	state   []byte
+	counter *counter
+}
+
+type counter struct {
+	total prometheus.Counter
+	drop  *prometheus.CounterVec
 }
 
 func (w *Worker) run(i uint) {
@@ -37,12 +45,21 @@ func (w *Worker) run(i uint) {
 			continue
 		}
 		if n < 48 {
+			if w.counter != nil {
+				w.counter.drop.WithLabelValues("small").Inc()
+			}
 			continue
 		}
 		if !isValidNTPRequest(buf) {
+			if w.counter != nil {
+				w.counter.drop.WithLabelValues("invalid").Inc()
+			}
 			continue
 		}
 		if w.cfg.InACL(remote.IP) {
+			if w.counter != nil {
+				w.counter.drop.WithLabelValues("acl").Inc()
+			}
 			continue
 		}
 		referTime = binary.BigEndian.Uint64(buf[transmitTimeStamp:])
@@ -53,6 +70,9 @@ func (w *Worker) run(i uint) {
 		_, err = w.conn.WriteToUDP(buf, remote)
 		if err != nil {
 			log.Println(err)
+		}
+		if w.counter != nil {
+			w.counter.total.Inc()
 		}
 	}
 }

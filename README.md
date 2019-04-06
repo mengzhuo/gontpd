@@ -8,16 +8,11 @@ gontpd is an experimental high-performance NTP server written in Go.
 It does not implement a full NTP client and relies on another NTP client and server to be running on the system instead. It periodically updates its state to mirror the real NTP client/server and uses multiple threads to serve the current system time.
 Inspired by [rsntp](https://github.com/mlichvar/rsntp)
 
-## Install or Build
+## Install
 
 ```
 # require go1.11
 go get github.com/mengzhuo/gontpd/cmd/gontpd
-```
-or
-```
-# require fpm
-./make.sh #  build debian package your
 ```
 
 ## Run

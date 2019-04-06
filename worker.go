@@ -33,7 +33,7 @@ func (w *Worker) run(i uint) {
 	for {
 		n, remote, err = w.conn.ReadFromUDP(buf)
 		rcvTime = time.Now()
-		if err != nil {
+		if err != nil || remote.Port == 0 {
 			continue
 		}
 		if n < 48 {

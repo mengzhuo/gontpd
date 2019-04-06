@@ -63,6 +63,9 @@ func (svr *Server) followUpState() (err error) {
 		err = fmt.Errorf("mismatch %x vs %x", cookie,
 			msg[originTimeStamp:originTimeStamp+8])
 	}
+	if msg[2] == 0 {
+		msg[2] = 0x8
+	}
 	copy(svr.state, msg)
 	return
 }

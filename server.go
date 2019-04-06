@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
@@ -124,6 +126,11 @@ func (s *Server) Run() {
 		}
 		go worker.run(i)
 		s.worker = append(s.worker, worker)
+	}
+	if s.cfg.Metric != "" {
+		http.Handle("/metrics", promhttp.Handler())
+		log.Printf("Listen metric: %s", s.cfg.Metric)
+		go http.ListenAndServe(s.cfg.Metric, nil)
 	}
 	time.Sleep(time.Second * 64)
 	s.updateWorker()

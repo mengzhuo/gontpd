@@ -14,10 +14,6 @@ import (
 )
 
 const (
-	nanoPerSec = 1e9
-)
-
-const (
 	referenceTimeStamp = iota*8 + 16
 	originTimeStamp
 	receiveTimeStamp

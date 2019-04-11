@@ -23,7 +23,7 @@ type counter struct {
 	drop  *prometheus.CounterVec
 }
 
-func (w *Worker) run(i uint) {
+func (w *Worker) run(i int) {
 	log.Printf("worker:%d online", i)
 	var (
 		buf    []byte

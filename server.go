@@ -74,23 +74,13 @@ type Server struct {
 }
 
 func (svr *Server) updateWorker() {
-	var err error
-	for {
-		err = svr.followUpState()
-		if err != nil {
-			log.Println(err)
-			time.Sleep(time.Second * 16)
-			continue
-		}
-		metaHdr := binary.BigEndian.Uint64(svr.state)
-		rootRefHdr := binary.BigEndian.Uint64(svr.state[rootRefOffset:])
-		refTimeHdr := binary.BigEndian.Uint64(svr.state[referenceTimeStamp:])
-		for i := range svr.worker {
-			svr.worker[i].metaHdr = metaHdr
-			svr.worker[i].rootRefHdr = rootRefHdr
-			svr.worker[i].refTimeHdr = refTimeHdr
-		}
-		time.Sleep(time.Second * 1024)
+	metaHdr := binary.BigEndian.Uint64(svr.state)
+	rootRefHdr := binary.BigEndian.Uint64(svr.state[rootRefOffset:])
+	refTimeHdr := binary.BigEndian.Uint64(svr.state[referenceTimeStamp:])
+	for i := range svr.worker {
+		svr.worker[i].metaHdr = metaHdr
+		svr.worker[i].rootRefHdr = rootRefHdr
+		svr.worker[i].refTimeHdr = refTimeHdr
 	}
 }
 
@@ -120,16 +110,31 @@ func (s *Server) Run() {
 			prometheus.MustRegister(s.drop)
 			worker.counter = s
 		}
-		go worker.run(i)
 		s.worker = append(s.worker, worker)
 	}
+	s.updateWorker()
+
+	for i := range s.worker {
+		go s.worker[i].run(i)
+	}
+
 	if s.cfg.Metric != "" {
 		http.Handle("/metrics", promhttp.Handler())
 		log.Printf("Listen metric: %s", s.cfg.Metric)
 		go http.ListenAndServe(s.cfg.Metric, nil)
 	}
-	time.Sleep(time.Second * 64)
-	s.updateWorker()
+	time.Sleep(256 * time.Second)
+
+	for {
+		err := s.followUpState()
+		if err != nil {
+			log.Println(err)
+			time.Sleep(16 * time.Second)
+			continue
+		}
+		s.updateWorker()
+		time.Sleep(256 * time.Second)
+	}
 }
 
 func makeDummyRequest() (p []byte) {

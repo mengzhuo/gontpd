@@ -3,6 +3,15 @@ package gontpd
 import "time"
 
 const (
+	metaOffset = iota * 8
+	rootRefOffset
+	referenceTimeStamp
+	originTimeStamp
+	receiveTimeStamp
+	transmitTimeStamp
+)
+
+const (
 	ntpEpochNanosecond = -2208988800000000000
 	nanoPerSec         = 1e9
 )

@@ -3,6 +3,7 @@ package gontpd
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
@@ -11,13 +12,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-)
-
-const (
-	referenceTimeStamp = iota*8 + 16
-	originTimeStamp
-	receiveTimeStamp
-	transmitTimeStamp
 )
 
 func New(cfg *Config) (svr *Server, err error) {
@@ -88,8 +82,13 @@ func (svr *Server) updateWorker() {
 			time.Sleep(time.Second * 16)
 			continue
 		}
+		metaHdr := binary.BigEndian.Uint64(svr.state)
+		rootRefHdr := binary.BigEndian.Uint64(svr.state[rootRefOffset:])
+		refTimeHdr := binary.BigEndian.Uint64(svr.state[referenceTimeStamp:])
 		for i := range svr.worker {
-			copy(svr.worker[i].state, svr.state)
+			svr.worker[i].metaHdr = metaHdr
+			svr.worker[i].rootRefHdr = rootRefHdr
+			svr.worker[i].refTimeHdr = refTimeHdr
 		}
 		time.Sleep(time.Second * 1024)
 	}
@@ -98,9 +97,8 @@ func (svr *Server) updateWorker() {
 func (s *Server) Run() {
 	for i := uint(0); i < s.cfg.Workernum; i++ {
 		worker := &Worker{
-			conn:  s.conn,
-			cfg:   s.cfg,
-			state: s.state}
+			conn: s.conn,
+			cfg:  s.cfg}
 
 		if s.cfg.Metric != "" {
 			s := &counter{}

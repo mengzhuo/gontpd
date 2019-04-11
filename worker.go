@@ -10,10 +10,12 @@ import (
 )
 
 type Worker struct {
-	conn    *net.UDPConn
-	cfg     *Config
-	state   []byte
-	counter *counter
+	conn       *net.UDPConn
+	cfg        *Config
+	counter    *counter
+	metaHdr    uint64
+	rootRefHdr uint64
+	refTimeHdr uint64
 }
 
 type counter struct {
@@ -29,14 +31,13 @@ func (w *Worker) run(i uint) {
 		remote *net.UDPAddr
 		err    error
 
-		rcvTime   time.Time
-		referTime uint64
+		rcvTime time.Time
+		txTime  uint64
 	)
 
 	buf = make([]byte, 48, 48)
 	// BCE
 	_ = buf[47]
-	_ = w.state[originTimeStamp-1]
 
 	for {
 		n, remote, err = w.conn.ReadFromUDP(buf)
@@ -62,9 +63,11 @@ func (w *Worker) run(i uint) {
 			}
 			continue
 		}
-		referTime = binary.BigEndian.Uint64(buf[transmitTimeStamp:])
-		copy(buf, w.state)
-		binary.BigEndian.PutUint64(buf[originTimeStamp:], referTime)
+		txTime = binary.BigEndian.Uint64(buf[transmitTimeStamp:])
+		binary.BigEndian.PutUint64(buf[metaOffset:], w.metaHdr)
+		binary.BigEndian.PutUint64(buf[rootRefOffset:], w.rootRefHdr)
+		binary.BigEndian.PutUint64(buf[referenceTimeStamp:], w.refTimeHdr)
+		binary.BigEndian.PutUint64(buf[originTimeStamp:], txTime)
 		binary.BigEndian.PutUint64(buf[receiveTimeStamp:], toNTPTime(rcvTime))
 		binary.BigEndian.PutUint64(buf[transmitTimeStamp:], toNTPTime(time.Now()))
 		_, err = w.conn.WriteToUDP(buf, remote)

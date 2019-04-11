@@ -6,6 +6,7 @@
 *.mmdb
 *.swp
 .log
+*_test.yaml
 
 # Test binary, build with `go test -c`
 *.test

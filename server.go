@@ -2,28 +2,23 @@ package gontpd
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"syscall"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/sys/unix"
 )
 
 func New(cfg *Config) (svr *Server, err error) {
-	addr, err := net.ResolveUDPAddr("udp", cfg.Listen)
-	if err != nil {
-		return nil, err
-	}
 	svr = &Server{cfg: cfg, state: make([]byte, originTimeStamp)}
-	svr.conn, err = net.ListenUDP("udp", addr)
-	if err != nil {
-		return
-	}
 	err = svr.followUpState()
 	return
 }
@@ -70,7 +65,6 @@ type Server struct {
 	worker []*Worker
 	state  []byte
 	cfg    *Config
-	conn   *net.UDPConn
 }
 
 func (svr *Server) updateWorker() {
@@ -84,10 +78,44 @@ func (svr *Server) updateWorker() {
 	}
 }
 
-func (s *Server) Run() {
+func (svr *Server) newListenConn() (conn *net.UDPConn, err error) {
+
+	var operr error
+	cfgFn := func(network, address string, conn syscall.RawConn) (err error) {
+
+		fn := func(fd uintptr) {
+			operr = syscall.SetsockoptInt(int(fd),
+				syscall.SOL_SOCKET,
+				unix.SO_REUSEPORT, 1)
+			if operr != nil {
+				return
+			}
+		}
+
+		if err = conn.Control(fn); err != nil {
+			return err
+		}
+		err = operr
+		return
+	}
+
+	lc := net.ListenConfig{Control: cfgFn}
+	lp, err := lc.ListenPacket(context.Background(), "udp", svr.cfg.Listen)
+	if err != nil {
+		return
+	}
+	conn = lp.(*net.UDPConn)
+	return
+}
+
+func (s *Server) Run() (err error) {
 	for i := uint(0); i < s.cfg.Workernum; i++ {
+		conn, err := s.newListenConn()
+		if err != nil {
+			return err
+		}
 		worker := &Worker{
-			conn: s.conn,
+			conn: conn,
 			cfg:  s.cfg}
 
 		if s.cfg.Metric != "" {

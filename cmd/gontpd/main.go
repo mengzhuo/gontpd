@@ -54,5 +54,5 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	d.Run()
+	log.Fatal(d.Run())
 }

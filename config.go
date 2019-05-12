@@ -15,6 +15,8 @@ type Config struct {
 	UpState   string   `yaml:"up_state"`
 	ACL       []string `yaml:"acl"`
 	rACL      []*net.IPNet
+
+	UpStateIntervalSec uint `yaml:"up_state_sec"`
 }
 
 func NewConfig(p string) (cfg *Config, err error) {
@@ -44,6 +46,10 @@ func NewConfig(p string) (cfg *Config, err error) {
 			return
 		}
 		cfg.rACL = append(cfg.rACL, n)
+	}
+
+	if cfg.UpStateIntervalSec < 3 {
+		cfg.UpStateIntervalSec = 3
 	}
 	return
 }

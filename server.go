@@ -151,7 +151,7 @@ func (s *Server) Run() (err error) {
 		log.Printf("Listen metric: %s", s.cfg.Metric)
 		go http.ListenAndServe(s.cfg.Metric, nil)
 	}
-	time.Sleep(256 * time.Second)
+	time.Sleep(time.Duration(s.cfg.UpStateIntervalSec) * time.Second)
 
 	for {
 		err := s.followUpState()
@@ -161,7 +161,7 @@ func (s *Server) Run() (err error) {
 			continue
 		}
 		s.updateWorker()
-		time.Sleep(256 * time.Second)
+		time.Sleep(time.Duration(s.cfg.UpStateIntervalSec) * time.Second)
 	}
 }
 

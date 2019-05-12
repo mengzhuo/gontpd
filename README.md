@@ -48,17 +48,15 @@ acl:
 
 iptables
 ```
--A PREROUTING -p udp -m udp --dport 123 -j NOTRACK
--A PREROUTING -p udp -m udp --dport 123 -j NOTRACK
--A OUTPUT -p udp -m udp --sport 123 -j NOTRACK
--A OUTPUT -p udp -m udp --sport 123 -j NOTRACK
+-A PREROUTING -p udp -m udp -t raw --dport 123 -j NOTRACK
+-A OUTPUT -p udp -m udp -t raw --sport 123 -j NOTRACK
 ```
 sysctl
 ```
-net.core.rmem_default = 512992
-net.core.rmem_max = 512992
-net.core.wmem_default = 512992
-net.core.wmem_max = 512992
+net.core.rmem_default = 5129920
+net.core.rmem_max = 5129920
+net.core.wmem_default = 5129920
+net.core.wmem_max = 5129920
 ```
 
 ## Performance

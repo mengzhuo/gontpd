@@ -35,6 +35,9 @@ func (svr *Server) followUpState() (err error) {
 		return
 	}
 	conn, err := net.DialUDP("udp", nil, addr)
+	if err != nil {
+		return
+	}
 	err = conn.SetDeadline(time.Now().Add(3 * time.Second))
 	if err != nil {
 		return

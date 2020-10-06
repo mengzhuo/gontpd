@@ -2,6 +2,7 @@ listen: ':123'
 worker_num: 2
 metric: ':7370'
 up_state: 127.0.0.1:1123
+up_state_sec: 3
 acl:
     - 10.0.0.0/8
     - 172.16.0.0/12

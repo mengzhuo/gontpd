@@ -1,11 +1,10 @@
-PET PROJECT WARNING: NOT PRODUCTION READY NO TESTES YET
-
 # GoNTPd
 [![GoDoc](https://godoc.org/github.com/mengzhuo/gontpd?status.svg)](https://godoc.org/github.com/mengzhuo/gontpd)
 [![Build Status](https://travis-ci.org/mengzhuo/gontpd.svg?branch=master)](https://travis-ci.org/mengzhuo/gontpd)
 
-gontpd is an experimental high-performance NTP server written in Go. 
-It does not implement a full NTP client and relies on another NTP client and server to be running on the system instead. It periodically updates its state to mirror the real NTP client/server and uses multiple threads to serve the current system time.
+GoNTPd is an experimental high-performance NTP server written in Go.
+It does NOT implement a full NTP client and relies on another NTP client and server to be running on the system instead.
+It periodically updates its state to mirror the real NTP client/server and uses multiple threads to serve the current system time.
 Inspired by [rsntp](https://github.com/mlichvar/rsntp)
 
 ## Install
@@ -33,6 +32,7 @@ metric: ':7370'
 
 # peer_list: upstream peer list that sync to
 up_state: 127.0.0.1:123
+up_state_sec: 16
 
 # acl: remote address within this list will be drop
 # suggest to drop private net request(mostly are spoof request)
